@@ -1,0 +1,103 @@
+SpotMyDime/
+├── app/
+│   ├── src/main/
+│   │   ├── java/com/spotmydime/
+│   │   │
+│   │   │   ── ui/                          ← All screens (Activities + Fragments)
+│   │   │   ├── onboarding/
+│   │   │   │   ├── OnboardingActivity.java       (screen 1 — splash)
+│   │   │   │   └── ConnectGmailActivity.java     (screen 2 — Gmail permission)
+│   │   │   │
+│   │   │   ├── home/
+│   │   │   │   └── HomeFragment.java             (screen 3 — dashboard)
+│   │   │   │
+│   │   │   ├── transactions/
+│   │   │   │   ├── TransactionsFragment.java     (screen 4 — transaction list)
+│   │   │   │   └── AddExpenseActivity.java       (screens 5+6 — add expense/income)
+│   │   │   │
+│   │   │   ├── insights/
+│   │   │   │   └── InsightsFragment.java         (screens 7,8,9,10 — tabs: overview/spending/income/trends)
+│   │   │   │
+│   │   │   └── settings/
+│   │   │       ├── SettingsFragment.java         (screen 11 — settings menu)
+│   │   │       ├── SubscriptionsActivity.java    (screen 12 — subscriptions)
+│   │   │       ├── BudgetGoalsActivity.java      (screen 13 — budget goals)
+│   │   │       ├── MerchantNicknamesActivity.java(screen 14 — nicknames)
+│   │   │       ├── CategoriesActivity.java       (screen 15 — categories list)
+│   │   │       ├── EditCategoryActivity.java     (screens 16+17 — category detail/edit)
+│   │   │       └── MailScanningActivity.java     (screen 18 — scan settings)
+│   │   │
+│   │   ├── data/
+│   │   │   ├── db/
+│   │   │   │   ├── AppDatabase.java              ← Room DB instance
+│   │   │   │   ├── dao/
+│   │   │   │   │   ├── TransactionDao.java
+│   │   │   │   │   ├── MerchantDao.java
+│   │   │   │   │   ├── CategoryDao.java
+│   │   │   │   │   ├── BudgetGoalDao.java
+│   │   │   │   │   └── SubscriptionDao.java
+│   │   │   │   └── entity/
+│   │   │   │       ├── Transaction.java
+│   │   │   │       ├── Merchant.java
+│   │   │   │       ├── Category.java
+│   │   │   │       ├── BudgetGoal.java
+│   │   │   │       └── Subscription.java
+│   │   │   └── repository/
+│   │   │       ├── TransactionRepository.java
+│   │   │       └── CategoryRepository.java
+│   │   │
+│   │   ├── gmail/
+│   │   │   ├── GmailSyncWorker.java          ← WorkManager background sync
+│   │   │   ├── EmailFetcher.java             ← connects + fetches raw emails
+│   │   │   ├── EmailParser.java              ← decodeBody(), buildQuery()
+│   │   │   ├── AmountExtractor.java          ← regex amount extraction
+│   │   │   ├── DateExtractor.java
+│   │   │   └── CategoryDetector.java         ← domain → category mapping
+│   │   │
+│   │   ├── detection/
+│   │   │   └── KeywordMatcher.java           ← subject line keyword filter
+│   │   │
+│   │   ├── navigation/
+│   │   │   └── MainActivity.java             ← hosts bottom nav + NavHostFragment
+│   │   │
+│   │   └── utils/
+│   │       ├── CurrencyFormatter.java
+│   │       ├── DateUtils.java
+│   │       └── NotificationHelper.java
+│   │
+│   └── res/
+│       ├── layout/
+│       │   ├── activity_onboarding.xml
+│       │   ├── activity_connect_gmail.xml
+│       │   ├── activity_main.xml
+│       │   ├── fragment_home.xml
+│       │   ├── fragment_transactions.xml
+│       │   ├── fragment_insights.xml
+│       │   ├── fragment_settings.xml
+│       │   ├── activity_add_expense.xml
+│       │   ├── activity_subscriptions.xml
+│       │   ├── activity_budget_goals.xml
+│       │   ├── activity_merchant_nicknames.xml
+│       │   ├── activity_categories.xml
+│       │   ├── activity_edit_category.xml
+│       │   ├── activity_mail_scanning.xml
+│       │   └── item_transaction.xml          ← RecyclerView row layout
+│       │
+│       ├── drawable/
+│       │   ├── circle_green.xml
+│       │   ├── bg_card.xml                   ← rounded card background
+│       │   ├── bg_pill_selected.xml          ← orange selected pill (bottom nav)
+│       │   ├── bg_field.xml                  ← rounded input field border
+│       │   └── ic_*.xml                      ← all your Tabler icons as vectors
+│       │
+│       ├── navigation/
+│       │   └── nav_graph.xml                 ← Jetpack Navigation graph
+│       │
+│       └── values/
+│           ├── colors.xml                    ← #F5F0E8, #2E7D32, #FFC107, etc.
+│           ├── strings.xml
+│           └── themes.xml
+│
+├── google-services.json
+├── build.gradle.kts
+└── README.md
