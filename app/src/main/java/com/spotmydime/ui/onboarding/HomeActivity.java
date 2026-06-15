@@ -1,29 +1,85 @@
 package com.spotmydime.ui.onboarding;
 
+import android.app.AlertDialog;
+import android.app.DatePickerDialog;
+import android.graphics.PorterDuff;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Button;
+import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 
 import com.spotmydime.R;
 import com.spotmydime.data.GmailFetcher;
+import com.spotmydime.data.ManualTransactionStore;
 import com.spotmydime.data.Transaction;
 import com.spotmydime.data.TransactionParser;
+import com.spotmydime.data.VendorStore;
 
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public class HomeActivity extends AppCompatActivity {
 
     private LinearLayout containerCategories;
     private LinearLayout containerTransactions;
+    private LinearLayout containerHome;
+    private LinearLayout containerDocument;
     private TextView tvTotalAmount;
     private TextView tvTrend;
+    private TextView btnClear;
+    private TextView tvDateRangeFilter;
+
+    private List<Transaction> allTransactions;
+    private String selectedCategory = null;
+    private Long startDateMillis = null;
+    private Long endDateMillis = null;
+    private boolean needsAuthRetry = false;
+
+    // Manual entry
+    private LinearLayout containerAdd;
+    private TextView toggleExpense;
+    private TextView toggleIncome;
+    private TextView etDate;
+    private TextView etCategory;
+    private EditText etAmount;
+    private TextView etPayment;
+    private EditText etNotes;
+    private TextView btnSave;
+    private boolean isExpense = true;
+    private long selectedDateMillis = System.currentTimeMillis();
+    private ManualTransactionStore manualStore;
+
+    private int selectedTab = 0;
+    private final int[] navIds = {
+            R.id.nav_home, R.id.nav_document, R.id.nav_add,
+            R.id.nav_gallery, R.id.nav_settings
+    };
+    private final int[] iconIds = {
+            R.id.ic_nav_home, R.id.ic_nav_document, R.id.ic_nav_add,
+            R.id.ic_nav_gallery, R.id.ic_nav_settings
+    };
+    private final int navOrange = 0xFFF9AC54;
+    private final int navWhite  = 0xFFFFFFFF;
+
+    private final SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd, yyyy", Locale.US);
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -40,12 +96,104 @@ public class HomeActivity extends AppCompatActivity {
             tvGreeting.setText("Hi there 👋");
         }
 
+        containerHome = findViewById(R.id.container_home);
+        containerDocument = findViewById(R.id.container_document);
         containerCategories = findViewById(R.id.container_categories);
         containerTransactions = findViewById(R.id.container_transactions);
         tvTotalAmount = findViewById(R.id.tv_total_amount);
         tvTrend = findViewById(R.id.tv_trend);
+        btnClear = findViewById(R.id.tv_clear);
+        tvDateRangeFilter = findViewById(R.id.tv_date_range_filter);
 
+        findViewById(R.id.btn_filter_category).setOnClickListener(v -> showCategoryPicker());
+        findViewById(R.id.btn_filter_date).setOnClickListener(v -> showDateRangePicker());
+        findViewById(R.id.btn_filter_all).setOnClickListener(v -> clearFilters());
+        btnClear.setOnClickListener(v -> clearFilters());
+
+        manualStore = new ManualTransactionStore(this);
+
+        // Manual entry form
+        containerAdd = findViewById(R.id.container_add);
+        toggleExpense = findViewById(R.id.toggle_expense);
+        toggleIncome = findViewById(R.id.toggle_income);
+        etDate = findViewById(R.id.et_date);
+        etCategory = findViewById(R.id.et_category);
+        etAmount = findViewById(R.id.et_amount);
+        etPayment = findViewById(R.id.et_payment);
+        etNotes = findViewById(R.id.et_notes);
+        btnSave = findViewById(R.id.btn_save);
+
+        toggleExpense.setOnClickListener(v -> setToggle(true));
+        toggleIncome.setOnClickListener(v -> setToggle(false));
+        etDate.setOnClickListener(v -> showDatePickerForEntry());
+        etCategory.setOnClickListener(v -> showCategoryPickerForEntry());
+        etPayment.setOnClickListener(v -> showPaymentPicker());
+        findViewById(R.id.btn_back_add).setOnClickListener(v -> setSelectedTab(1));
+        btnSave.setOnClickListener(v -> saveManualTransaction());
+
+        setToggle(true);
+
+        setupBottomNav();
         fetchAndShowTransactions();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (needsAuthRetry) {
+            needsAuthRetry = false;
+            fetchAndShowTransactions();
+        }
+    }
+
+    private int getCategoryColor(String cat) {
+        if (cat == null) return 0xFF424242;
+        switch (cat.toLowerCase()) {
+            case "shopping": return 0xFFFFA726; // orange
+            case "transport":
+            case "transportation": return 0xFFE53935; // red
+            case "food": return 0xFF29B6F6; // blue/teal
+            case "grocery": return 0xFF4CAF50; // green
+            case "entertainment": return 0xFF8E24AA; // purple
+            default: return 0xFF424242; // dark gray/black
+        }
+    }
+
+    private void setupBottomNav() {
+        for (int i = 0; i < navIds.length; i++) {
+            final int index = i;
+            findViewById(navIds[i]).setOnClickListener(v -> setSelectedTab(index));
+        }
+        setSelectedTab(0);
+    }
+
+    private void setSelectedTab(int index) {
+        selectedTab = index;
+
+        for (int i = 0; i < navIds.length; i++) {
+            LinearLayout tab = findViewById(navIds[i]);
+            ImageView icon = tab.findViewById(iconIds[i]);
+
+            if (i == index) {
+                tab.setBackgroundResource(R.drawable.nav_bg_active);
+                icon.setBackground(null);
+                icon.setColorFilter(navWhite, PorterDuff.Mode.SRC_IN);
+            } else {
+                tab.setBackground(null);
+                icon.setBackgroundResource(R.drawable.nav_bg_inactive);
+                icon.setColorFilter(navOrange, PorterDuff.Mode.SRC_IN);
+            }
+        }
+
+        containerHome.setVisibility(index == 0 ? View.VISIBLE : View.GONE);
+        containerDocument.setVisibility(index == 1 ? View.VISIBLE : View.GONE);
+        if (containerAdd != null) {
+            containerAdd.setVisibility(index == 2 ? View.VISIBLE : View.GONE);
+        }
+
+        if (index > 2) {
+            Toast.makeText(this, "Coming soon", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void fetchAndShowTransactions() {
@@ -56,11 +204,17 @@ public class HomeActivity extends AppCompatActivity {
             public void onResult(List<Transaction> transactions) {
                 runOnUiThread(() -> {
                     findViewById(R.id.tv_loading).setVisibility(View.GONE);
-                    if (transactions.isEmpty()) {
+                    List<Transaction> manual = manualStore.getAll();
+                    List<Transaction> merged = new ArrayList<>();
+                    merged.addAll(manual);
+                    merged.addAll(transactions);
+                    merged.sort((a, b) -> Long.compare(b.getDateMillis(), a.getDateMillis()));
+                    allTransactions = merged;
+                    if (merged.isEmpty()) {
                         addEmptyState();
-                        return;
+                    } else {
+                        populateDashboard(merged);
                     }
-                    populateDashboard(transactions);
                 });
             }
 
@@ -68,6 +222,9 @@ public class HomeActivity extends AppCompatActivity {
             public void onError(String message) {
                 runOnUiThread(() -> {
                     findViewById(R.id.tv_loading).setVisibility(View.GONE);
+                    if (message.contains("Authorization required")) {
+                        needsAuthRetry = true;
+                    }
                     addErrorState(message);
                 });
             }
@@ -75,12 +232,19 @@ public class HomeActivity extends AppCompatActivity {
     }
 
     private void populateDashboard(List<Transaction> transactions) {
-        double total = 0;
+        double totalOutgoing = 0;
+        double totalIncoming = 0;
         for (Transaction t : transactions) {
-            total += t.getAmount();
+            if (t.getType() == Transaction.Type.OUTGOING) {
+                totalOutgoing += t.getAmount();
+            } else {
+                totalIncoming += t.getAmount();
+            }
         }
-        tvTotalAmount.setText(TransactionParser.formatAmount(total));
-        tvTrend.setText("↑ " + transactions.size() + " transactions this period");
+        tvTotalAmount.setText(TransactionParser.formatAmount(totalOutgoing));
+        String trend = "↓ $" + String.format("%.0f", totalIncoming) + " in · "
+                + transactions.size() + " txns";
+        tvTrend.setText(trend);
         tvTrend.setVisibility(View.VISIBLE);
 
         Map<String, Double> categoryTotals = new HashMap<>();
@@ -114,15 +278,81 @@ public class HomeActivity extends AppCompatActivity {
             row.setLayoutParams(lp);
         }
 
+        renderTransactionList(transactions);
+    }
+
+    private void renderTransactionList(List<Transaction> transactions) {
         containerTransactions.removeAllViews();
+
+        // Ensure transactions are sorted newest first
+        transactions.sort((a, b) -> Long.compare(b.getDateMillis(), a.getDateMillis()));
+
+        String lastLabel = null;
         for (Transaction t : transactions) {
+            Date d = new Date(t.getDateMillis());
+            String label;
+            // Today / Yesterday / date
+            Calendar cal = Calendar.getInstance();
+            Calendar tx = Calendar.getInstance();
+            tx.setTimeInMillis(t.getDateMillis());
+            boolean isToday = cal.get(Calendar.YEAR) == tx.get(Calendar.YEAR)
+                    && cal.get(Calendar.DAY_OF_YEAR) == tx.get(Calendar.DAY_OF_YEAR);
+            cal.add(Calendar.DAY_OF_YEAR, -1);
+            boolean isYesterday = cal.get(Calendar.YEAR) == tx.get(Calendar.YEAR)
+                    && cal.get(Calendar.DAY_OF_YEAR) == tx.get(Calendar.DAY_OF_YEAR);
+
+            if (isToday) label = "Today";
+            else if (isYesterday) label = "Yesterday";
+            else label = dateFormat.format(d);
+
+            if (!label.equals(lastLabel)) {
+                // add section header
+                LinearLayout header = new LinearLayout(this);
+                header.setOrientation(LinearLayout.HORIZONTAL);
+                header.setLayoutParams(new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                header.setPadding(0, 16, 0, 8);
+
+                TextView left = new TextView(this);
+                left.setText(label);
+                left.setTextSize(16);
+                left.setTextColor(0xFF111111);
+                left.setTypeface(null, android.graphics.Typeface.BOLD);
+                LinearLayout.LayoutParams lpLeft = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+                left.setLayoutParams(lpLeft);
+
+                TextView right = new TextView(this);
+                right.setText("View all");
+                right.setTextSize(13);
+                right.setTextColor(0xFF888888);
+                right.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+                header.addView(left);
+                header.addView(right);
+                containerTransactions.addView(header);
+
+                lastLabel = label;
+            }
+
             View row = getLayoutInflater().inflate(R.layout.item_transaction_row, containerTransactions, false);
 
-            ((TextView) row.findViewById(R.id.tv_avatar)).setText(String.valueOf(t.getAvatarLetter()));
-            ((TextView) row.findViewById(R.id.tv_merchant)).setText(t.getMerchant());
+            TextView tvAvatar = row.findViewById(R.id.tv_avatar);
+            String merchant = t.getMerchant() != null ? t.getMerchant() : "?";
+            tvAvatar.setText(merchant.substring(0, 1).toUpperCase());
+
+            ((TextView) row.findViewById(R.id.tv_merchant)).setText(merchant);
             ((TextView) row.findViewById(R.id.tv_date)).setText(t.getDateDisplay());
             ((TextView) row.findViewById(R.id.tv_amount)).setText(TransactionParser.formatAmount(t.getAmount()));
-            ((TextView) row.findViewById(R.id.tv_category_badge)).setText(t.getCategory());
+
+            TextView badge = row.findViewById(R.id.tv_category_badge);
+            String cat = t.getCategory() != null ? t.getCategory() : "Other";
+            badge.setText(cat);
+            // set badge tint based on category
+            int color = getCategoryColor(cat);
+            if (badge.getBackground() != null) badge.getBackground().setTint(color);
+
+            final Transaction tapped = t;
+            row.setOnClickListener(v -> showTransactionDetail(tapped));
 
             containerTransactions.addView(row);
 
@@ -131,6 +361,286 @@ public class HomeActivity extends AppCompatActivity {
             row.setLayoutParams(lp);
         }
     }
+
+    private void showTransactionDetail(Transaction t) {
+        String email = t.getSenderEmail() != null ? t.getSenderEmail() : "—";
+        String subject = t.getSubject() != null && !t.getSubject().isEmpty() ? t.getSubject() : "—";
+
+        int bgColor = 0xFFF5F0E8;
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(40, 24, 40, 24);
+        layout.setBackgroundColor(bgColor);
+
+        // Read-only info rows
+        addDetailRow(layout, "Email", email);
+        addDetailRow(layout, "Amount", TransactionParser.formatAmount(t.getAmount()));
+        addDetailRow(layout, "Date", t.getDateDisplay());
+        addDetailRow(layout, "Type", t.getType() == Transaction.Type.INCOMING ? "Incoming" : "Outgoing");
+        addDetailRow(layout, "Subject", subject);
+
+        // Divider
+        View divider = new View(this);
+        divider.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 1));
+        divider.setBackgroundColor(0xFFE0D5C0);
+        divider.setPadding(0, 12, 0, 12);
+        layout.addView(divider);
+
+        // ── Editable Merchant ──
+        TextView tvMerchantLabel = new TextView(this);
+        tvMerchantLabel.setText("Merchant");
+        tvMerchantLabel.setTextSize(11);
+        tvMerchantLabel.setTextColor(0xFF888888);
+        tvMerchantLabel.setTypeface(null, android.graphics.Typeface.BOLD);
+        tvMerchantLabel.setPadding(0, 8, 0, 4);
+        layout.addView(tvMerchantLabel);
+
+        EditText etEditMerchant = new EditText(this);
+        etEditMerchant.setText(t.getMerchant());
+        etEditMerchant.setTextSize(15);
+        etEditMerchant.setTextColor(0xFF111111);
+        etEditMerchant.setBackgroundResource(R.drawable.input_outline);
+        etEditMerchant.setPadding(16, 12, 16, 12);
+        etEditMerchant.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        layout.addView(etEditMerchant);
+
+        // ── Editable Category ──
+        TextView tvCatLabel = new TextView(this);
+        tvCatLabel.setText("Category (future emails from this merchant will use this)");
+        tvCatLabel.setTextSize(11);
+        tvCatLabel.setTextColor(0xFF888888);
+        tvCatLabel.setTypeface(null, android.graphics.Typeface.BOLD);
+        tvCatLabel.setPadding(0, 16, 0, 4);
+        layout.addView(tvCatLabel);
+
+        String[] allCategories = {
+                "Food & Dining", "Shopping", "Subscriptions", "Transportation",
+                "Bills & Utilities", "Entertainment", "Health", "Interac Sent",
+                "Interac Received", "Transfers", "Travel", "Other"
+        };
+        final String[] selectedCategory = {t.getCategory() != null ? t.getCategory() : "Other"};
+
+        TextView tvSelectedCat = new TextView(this);
+        tvSelectedCat.setText(selectedCategory[0]);
+        tvSelectedCat.setTextSize(15);
+        tvSelectedCat.setTextColor(0xFF111111);
+        tvSelectedCat.setBackgroundResource(R.drawable.input_outline);
+        tvSelectedCat.setPadding(16, 12, 16, 12);
+        tvSelectedCat.setClickable(true);
+        tvSelectedCat.setFocusable(true);
+        tvSelectedCat.setOnClickListener(v -> {
+            int checked = 0;
+            for (int i = 0; i < allCategories.length; i++) {
+                if (allCategories[i].equals(selectedCategory[0])) {
+                    checked = i;
+                    break;
+                }
+            }
+            new AlertDialog.Builder(this)
+                    .setTitle("Select Category")
+                    .setSingleChoiceItems(allCategories, checked, (dialog, which) -> {
+                        selectedCategory[0] = allCategories[which];
+                        tvSelectedCat.setText(allCategories[which]);
+                        dialog.dismiss();
+                    })
+                    .show();
+        });
+        layout.addView(tvSelectedCat);
+
+        // ── Save Button ──
+        Button btnSaveMapping = new Button(this);
+        btnSaveMapping.setText("Save Mapping");
+        btnSaveMapping.setTextSize(14);
+        btnSaveMapping.setTextColor(0xFFF9AC54);
+        btnSaveMapping.setBackgroundResource(R.drawable.btn_save_outline);
+        btnSaveMapping.setPadding(0, 0, 0, 0);
+        LinearLayout.LayoutParams btnLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, 48);
+        btnLp.gravity = android.view.Gravity.CENTER;
+        btnLp.topMargin = 20;
+        btnSaveMapping.setLayoutParams(btnLp);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Transaction Details")
+                .setView(layout)
+                .setPositiveButton("Close", null)
+                .create();
+
+        btnSaveMapping.setOnClickListener(v -> {
+            String newMerchant = etEditMerchant.getText().toString().trim();
+            String newCategory = selectedCategory[0];
+            if (!newMerchant.isEmpty()) {
+                VendorStore vs = new VendorStore(this);
+                vs.setCategory(newMerchant, newCategory);
+                Toast.makeText(this, "Saved: " + newMerchant + " → " + newCategory, Toast.LENGTH_SHORT).show();
+                dialog.dismiss();
+                fetchAndShowTransactions();
+            } else {
+                Toast.makeText(this, "Merchant name cannot be empty", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        layout.addView(btnSaveMapping);
+
+        dialog.show();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(bgColor));
+        }
+    }
+
+    private void addDetailRow(LinearLayout parent, String label, String value) {
+        if (value == null) value = "—";
+
+        TextView tvLabel = new TextView(this);
+        tvLabel.setText(label);
+        tvLabel.setTextSize(11);
+        tvLabel.setTextColor(0xFF888888);
+        tvLabel.setTypeface(null, android.graphics.Typeface.BOLD);
+        tvLabel.setPadding(0, 8, 0, 2);
+
+        TextView tvValue = new TextView(this);
+        tvValue.setText(value);
+        tvValue.setTextSize(15);
+        tvValue.setTextColor(0xFF111111);
+
+        parent.addView(tvLabel);
+        parent.addView(tvValue);
+    }
+
+    // ── FILTERING ──
+
+    private void showCategoryPicker() {
+        if (allTransactions == null) return;
+
+        Set<String> catSet = new HashSet<>();
+        for (Transaction t : allTransactions) {
+            if (t.getCategory() != null) catSet.add(t.getCategory());
+        }
+        List<String> categories = catSet.stream().sorted().collect(Collectors.toList());
+        String[] items = new String[categories.size() + 1];
+        items[0] = "All Categories";
+        for (int i = 0; i < categories.size(); i++) {
+            items[i + 1] = categories.get(i);
+        }
+
+        int checked = 0;
+        if (selectedCategory != null) {
+            for (int i = 0; i < items.length; i++) {
+                if (items[i].equals(selectedCategory)) {
+                    checked = i;
+                    break;
+                }
+            }
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle("Filter by Category")
+                .setSingleChoiceItems(items, checked, (dialog, which) -> {
+                    if (which == 0) {
+                        selectedCategory = null;
+                        Toast.makeText(this, "Showing all categories", Toast.LENGTH_SHORT).show();
+                    } else {
+                        selectedCategory = items[which];
+                        Toast.makeText(this, "Showing: " + items[which], Toast.LENGTH_SHORT).show();
+                    }
+                    dialog.dismiss();
+                    filterAndRender();
+                })
+                .show();
+    }
+
+    private void showDateRangePicker() {
+        Calendar cal = Calendar.getInstance();
+
+        new DatePickerDialog(this,
+                (view, year, month, dayOfMonth) -> {
+                    Calendar start = Calendar.getInstance();
+                    start.set(year, month, dayOfMonth, 0, 0, 0);
+                    startDateMillis = start.getTimeInMillis();
+
+                    new DatePickerDialog(this,
+                            (view2, year2, month2, dayOfMonth2) -> {
+                                Calendar end = Calendar.getInstance();
+                                end.set(year2, month2, dayOfMonth2, 23, 59, 59);
+                                endDateMillis = end.getTimeInMillis();
+
+                                String label = dateFormat.format(new Date(startDateMillis))
+                                        + " - " + dateFormat.format(new Date(endDateMillis));
+                                Toast.makeText(this, "Showing: " + label, Toast.LENGTH_SHORT).show();
+                                filterAndRender();
+                            },
+                            cal.get(Calendar.YEAR),
+                            cal.get(Calendar.MONTH),
+                            cal.get(Calendar.DAY_OF_MONTH))
+                            .show();
+                },
+                cal.get(Calendar.YEAR),
+                cal.get(Calendar.MONTH),
+                cal.get(Calendar.DAY_OF_MONTH))
+                .show();
+    }
+
+    private void clearFilters() {
+        selectedCategory = null;
+        startDateMillis = null;
+        endDateMillis = null;
+        tvDateRangeFilter.setVisibility(View.GONE);
+        Toast.makeText(this, "Filters cleared", Toast.LENGTH_SHORT).show();
+        if (allTransactions != null) {
+            populateDashboard(allTransactions);
+        }
+    }
+
+    private void filterAndRender() {
+        if (allTransactions == null) return;
+
+        List<Transaction> filtered = allTransactions;
+
+        if (selectedCategory != null) {
+            filtered = filtered.stream()
+                    .filter(t -> selectedCategory.equals(t.getCategory()))
+                    .collect(Collectors.toList());
+        }
+
+        if (startDateMillis != null) {
+            filtered = filtered.stream()
+                    .filter(t -> t.getDateMillis() >= startDateMillis)
+                    .collect(Collectors.toList());
+        }
+
+        if (endDateMillis != null) {
+            filtered = filtered.stream()
+                    .filter(t -> t.getDateMillis() <= endDateMillis)
+                    .collect(Collectors.toList());
+        }
+
+        // Display date range if filtering by dates
+        if (startDateMillis != null && endDateMillis != null) {
+            String dateRangeLabel = dateFormat.format(new Date(startDateMillis))
+                    + " - " + dateFormat.format(new Date(endDateMillis));
+            tvDateRangeFilter.setText(dateRangeLabel);
+            tvDateRangeFilter.setVisibility(View.VISIBLE);
+        } else {
+            tvDateRangeFilter.setVisibility(View.GONE);
+        }
+
+        if (filtered.isEmpty()) {
+            containerTransactions.removeAllViews();
+            TextView empty = new TextView(this);
+            empty.setText("No transactions match your filters.");
+            empty.setTextColor(0xFF888888);
+            empty.setTextSize(14);
+            empty.setGravity(android.view.Gravity.CENTER);
+            empty.setPadding(0, 40, 0, 40);
+            containerTransactions.addView(empty);
+        } else {
+            renderTransactionList(filtered);
+        }
+    }
+
+    // ── EMPTY / ERROR STATES ──
 
     private void addEmptyState() {
         containerTransactions.removeAllViews();
@@ -152,5 +662,122 @@ public class HomeActivity extends AppCompatActivity {
         empty.setGravity(android.view.Gravity.CENTER);
         empty.setPadding(0, 40, 0, 40);
         containerTransactions.addView(empty);
+    }
+
+    // ════════════════════════════════════════════════════════════
+    // MANUAL ENTRY
+    // ════════════════════════════════════════════════════════════
+
+    private void setToggle(boolean expense) {
+        isExpense = expense;
+        int activeBg = R.drawable.toggle_active;
+        int inactiveTextColor = 0xFFFFFFFF;
+        int activeTextColorExpense = 0xFFE53935;
+        int activeTextColorIncome = 0xFF4CAF50;
+
+        toggleExpense.setBackgroundResource(expense ? activeBg : 0);
+        toggleIncome.setBackgroundResource(expense ? 0 : activeBg);
+
+        toggleExpense.setTextColor(expense ? activeTextColorExpense : inactiveTextColor);
+        toggleIncome.setTextColor(expense ? inactiveTextColor : activeTextColorIncome);
+
+        // Update save button
+        btnSave.setTextColor(expense ? 0xFFE53935 : 0xFF4CAF50);
+        btnSave.setBackgroundResource(expense ? R.drawable.btn_save_outline : R.drawable.btn_save_outline_income);
+
+        // Update header title
+        TextView tvAddTitle = findViewById(R.id.tv_add_title);
+        if (tvAddTitle != null) {
+            tvAddTitle.setText(expense ? "Add Expense" : "Add Income");
+        }
+    }
+
+    private void showDatePickerForEntry() {
+        Calendar cal = Calendar.getInstance();
+        cal.setTimeInMillis(selectedDateMillis);
+        new DatePickerDialog(this,
+                (view, year, month, dayOfMonth) -> {
+                    Calendar picked = Calendar.getInstance();
+                    picked.set(year, month, dayOfMonth, 0, 0, 0);
+                    selectedDateMillis = picked.getTimeInMillis();
+                    etDate.setText(dateFormat.format(new Date(selectedDateMillis)));
+                },
+                cal.get(Calendar.YEAR),
+                cal.get(Calendar.MONTH),
+                cal.get(Calendar.DAY_OF_MONTH))
+                .show();
+    }
+
+    private void showCategoryPickerForEntry() {
+        String[] categories = {
+                "Food & Dining", "Shopping", "Subscriptions", "Transportation",
+                "Bills & Utilities", "Entertainment", "Health", "Interac Sent",
+                "Interac Received", "Transfers", "Travel", "Other"
+        };
+
+        new AlertDialog.Builder(this)
+                .setTitle("Select Category")
+                .setItems(categories, (dialog, which) -> etCategory.setText(categories[which]))
+                .show();
+    }
+
+    private void showPaymentPicker() {
+        String[] methods = {"Cash", "Credit Card", "Debit Card", "Interac", "PayPal", "Bank Transfer", "Other"};
+        new AlertDialog.Builder(this)
+                .setTitle("Select Payment Method")
+                .setItems(methods, (dialog, which) -> etPayment.setText(methods[which]))
+                .show();
+    }
+
+    private void saveManualTransaction() {
+        String merchant = etCategory.getText().toString().trim();
+        String amountStr = etAmount.getText().toString().trim();
+        String category = etCategory.getText().toString().trim();
+        String payment = etPayment.getText().toString().trim();
+        String notes = etNotes.getText().toString().trim();
+
+        if (merchant.isEmpty()) {
+            Toast.makeText(this, "Please select a category", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (amountStr.isEmpty()) {
+            Toast.makeText(this, "Please enter an amount", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        double amount;
+        try {
+            amount = Double.parseDouble(amountStr);
+        } catch (NumberFormatException e) {
+            Toast.makeText(this, "Invalid amount", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Transaction.Type type = isExpense ? Transaction.Type.OUTGOING : Transaction.Type.INCOMING;
+        String dateDisplay = etDate.getText().toString();
+        if (dateDisplay.isEmpty() || dateDisplay.equals("Pick")) {
+            Calendar cal = Calendar.getInstance();
+            selectedDateMillis = cal.getTimeInMillis();
+            dateDisplay = dateFormat.format(new Date(selectedDateMillis));
+        }
+
+        String displayMerchant = payment.isEmpty() ? category : category + " (" + payment + ")";
+        Transaction t = ManualTransactionStore.createTransaction(
+                displayMerchant, amount, selectedDateMillis, dateDisplay,
+                category, type, notes
+        );
+        manualStore.save(t);
+
+        Toast.makeText(this, (isExpense ? "Expense" : "Income") + " saved", Toast.LENGTH_SHORT).show();
+
+        // Clear form
+        etCategory.setText("");
+        etAmount.setText("");
+        etPayment.setText("");
+        etNotes.setText("");
+        etDate.setText("");
+
+        // Refresh data
+        fetchAndShowTransactions();
     }
 }

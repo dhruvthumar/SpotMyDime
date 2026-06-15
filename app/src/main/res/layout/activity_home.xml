@@ -1,244 +1,699 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-    app/src/main/res/layout/activity_home.xml
-    Dashboard screen — matches screen 3 from your mockups.
-    Static placeholder data for now, wired to real DB in next feature.
--->
-<androidx.core.widget.NestedScrollView
+<FrameLayout
         xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:app="http://schemas.android.com/apk/res-auto"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#F5F0E8"
-        android:fillViewport="true">
+        android:background="#F5F0E8">
 
-    <LinearLayout
+    <androidx.core.widget.NestedScrollView
+            android:id="@+id/scroll_content"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:paddingBottom="80dp">
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:clipToPadding="false"
+            android:paddingBottom="88dp">
 
-        <!-- ── TOP BAR ── -->
-        <RelativeLayout
+        <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:paddingHorizontal="20dp"
-                android:layout_marginTop="16dp">
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
 
-            <ImageView
-                    android:id="@+id/btn_menu"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:src="@android:drawable/ic_menu_sort_by_size"
-                    android:background="@drawable/circle_outline"
-                    android:padding="8dp"
-                    android:layout_centerVertical="true"
-                    android:layout_alignParentStart="true"
-                    android:contentDescription="Menu" />
-
-            <!-- Two-colour title — styled in XML using two TextViews -->
+            <!-- ════════════════════════════════════════════════ -->
+            <!-- TAB 1 – HOME CONTENT                            -->
+            <!-- ════════════════════════════════════════════════════ -->
             <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_centerInParent="true">
-
-                <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="SpotMy"
-                        android:textColor="#111111"
-                        android:textSize="20sp"
-                        android:textStyle="bold" />
-
-                <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Dime"
-                        android:textColor="#2E7D32"
-                        android:textSize="20sp"
-                        android:textStyle="bold" />
-            </LinearLayout>
-
-            <ImageView
-                    android:id="@+id/btn_notifications"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:src="@android:drawable/ic_popup_reminder"
-                    android:background="@drawable/circle_outline"
-                    android:padding="8dp"
-                    android:layout_centerVertical="true"
-                    android:layout_alignParentEnd="true"
-                    android:contentDescription="Notifications" />
-        </RelativeLayout>
-
-        <!-- ── GREETING ── -->
-        <TextView
-                android:id="@+id/tv_greeting"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Hi there 👋"
-                android:textColor="#111111"
-                android:textSize="16sp"
-                android:layout_marginStart="20dp"
-                android:layout_marginTop="8dp" />
-
-        <!-- ── THIS MONTH CARD ── -->
-        <androidx.cardview.widget.CardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginHorizontal="20dp"
-                android:layout_marginTop="16dp"
-                app:cardBackgroundColor="#FFFFFF"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="4dp">
-
-            <RelativeLayout
+                    android:id="@+id/container_home"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:padding="20dp">
+                    android:orientation="vertical">
 
-                <LinearLayout
-                        android:id="@+id/ll_amount"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:layout_alignParentStart="true">
+                <!-- ── TOP BAR ── -->
+                <RelativeLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="56dp"
+                        android:paddingHorizontal="20dp"
+                        android:layout_marginTop="16dp">
 
-                    <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="This Month"
-                            android:textColor="#888888"
-                            android:textSize="13sp" />
+                    <ImageView
+                            android:id="@+id/btn_menu"
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:src="@android:drawable/ic_menu_sort_by_size"
+                            android:background="@drawable/circle_outline"
+                            android:padding="8dp"
+                            android:layout_centerVertical="true"
+                            android:layout_alignParentStart="true"
+                            android:contentDescription="Menu" />
 
-                    <TextView
-                            android:id="@+id/tv_total_amount"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="$0.00"
-                            android:textColor="#111111"
-                            android:textSize="32sp"
-                            android:textStyle="bold"
-                            android:layout_marginTop="4dp" />
-
-                    <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Net Cash Flow"
-                            android:textColor="#888888"
-                            android:textSize="13sp" />
-
-                    <!-- Trend indicator -->
                     <LinearLayout
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:orientation="horizontal"
-                            android:gravity="center_vertical"
-                            android:layout_marginTop="12dp">
+                            android:layout_centerInParent="true">
 
                         <TextView
-                                android:id="@+id/tv_trend"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text=""
+                                android:text="SpotMy"
+                                android:textColor="#111111"
+                                android:textSize="20sp"
+                                android:textStyle="bold" />
+
+                        <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Dime"
                                 android:textColor="#2E7D32"
-                                android:textSize="13sp"
-                                android:visibility="gone" />
+                                android:textSize="20sp"
+                                android:textStyle="bold" />
                     </LinearLayout>
+
+                    <ImageView
+                            android:id="@+id/btn_notifications"
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:src="@android:drawable/ic_popup_reminder"
+                            android:background="@drawable/circle_outline"
+                            android:padding="8dp"
+                            android:layout_centerVertical="true"
+                            android:layout_alignParentEnd="true"
+                            android:contentDescription="Notifications" />
+                </RelativeLayout>
+
+                <!-- ── GREETING ── -->
+                <TextView
+                        android:id="@+id/tv_greeting"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Hi there 👋"
+                        android:textColor="#111111"
+                        android:textSize="16sp"
+                        android:layout_marginStart="20dp"
+                        android:layout_marginTop="8dp" />
+
+                <!-- ── THIS MONTH CARD ── -->
+                <androidx.cardview.widget.CardView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="20dp"
+                        android:layout_marginTop="16dp"
+                        app:cardBackgroundColor="#FFFFFF"
+                        app:cardCornerRadius="16dp"
+                        app:cardElevation="4dp">
+
+                    <RelativeLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:padding="20dp">
+
+                        <LinearLayout
+                                android:id="@+id/ll_amount"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:layout_alignParentStart="true">
+
+                            <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="This Month"
+                                    android:textColor="#888888"
+                                    android:textSize="13sp" />
+
+                            <TextView
+                                    android:id="@+id/tv_total_amount"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="$0.00"
+                                    android:textColor="#111111"
+                                    android:textSize="32sp"
+                                    android:textStyle="bold"
+                                    android:layout_marginTop="4dp" />
+
+                            <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Net Cash Flow"
+                                    android:textColor="#888888"
+                                    android:textSize="13sp" />
+
+                            <LinearLayout
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="horizontal"
+                                    android:gravity="center_vertical"
+                                    android:layout_marginTop="12dp">
+
+                                <TextView
+                                        android:id="@+id/tv_trend"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text=""
+                                        android:textColor="#2E7D32"
+                                        android:textSize="13sp"
+                                        android:visibility="gone" />
+                            </LinearLayout>
+                        </LinearLayout>
+
+                        <ImageView
+                                android:layout_width="80dp"
+                                android:layout_height="80dp"
+                                android:src="@android:drawable/ic_menu_report_image"
+                                android:layout_alignParentEnd="true"
+                                android:layout_centerVertical="true"
+                                android:contentDescription="Spending chart" />
+
+                    </RelativeLayout>
+                </androidx.cardview.widget.CardView>
+
+                <!-- ── TOP CATEGORIES ── -->
+                <RelativeLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingHorizontal="20dp"
+                        android:layout_marginTop="24dp">
+
+                    <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Top Categories"
+                            android:textColor="#111111"
+                            android:textSize="17sp"
+                            android:textStyle="bold"
+                            android:layout_alignParentStart="true" />
+
+                    <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="View all"
+                            android:textColor="#888888"
+                            android:textSize="13sp"
+                            android:layout_alignParentEnd="true"
+                            android:layout_centerVertical="true" />
+                </RelativeLayout>
+
+                <LinearLayout
+                        android:id="@+id/container_categories"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingHorizontal="20dp"
+                        android:layout_marginTop="12dp" />
+
+            </LinearLayout>
+
+            <!-- ════════════════════════════════════════════════════ -->
+            <!-- TAB 2 – TRANSACTIONS / DOCUMENT CONTENT             -->
+            <!-- ════════════════════════════════════════════════════ -->
+            <LinearLayout
+                    android:id="@+id/container_document"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                <!-- ── HEADER ── -->
+                <RelativeLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="56dp"
+                        android:paddingHorizontal="20dp"
+                        android:layout_marginTop="16dp">
+
+                    <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Transactions"
+                            android:textColor="#111111"
+                            android:textSize="22sp"
+                            android:textStyle="bold"
+                            android:layout_centerVertical="true" />
+
+                    <TextView
+                            android:id="@+id/tv_clear"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Clear"
+                            android:textColor="#F9AC54"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            android:layout_alignParentEnd="true"
+                            android:layout_centerVertical="true" />
+                </RelativeLayout>
+
+                <!-- ── FILTER BAR ── -->
+                <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="80dp"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:paddingHorizontal="8dp"
+                        android:layout_marginTop="8dp">
+
+                    <LinearLayout
+                            android:id="@+id/btn_filter_category"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:orientation="horizontal"
+                            android:gravity="center"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:foreground="?attr/selectableItemBackground">
+
+                        <ImageView
+                                android:id="@+id/iv_filter_category"
+                                android:layout_width="130dp"
+                                android:layout_height="130dp"
+                                android:src="@drawable/ic_filter_category"
+                                android:contentDescription="Filter by category"
+                                android:adjustViewBounds="true"
+                                android:scaleType="fitCenter"
+                                android:padding="12dp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                            android:id="@+id/btn_filter_date"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:orientation="horizontal"
+                            android:gravity="center"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:foreground="?attr/selectableItemBackground">
+
+                        <ImageView
+                                android:id="@+id/iv_filter_date"
+                                android:layout_width="130dp"
+                                android:layout_height="130dp"
+                                android:src="@drawable/ic_filter_date"
+                                android:contentDescription="Filter by date range"
+                                android:adjustViewBounds="true"
+                                android:scaleType="fitCenter"
+                                android:padding="12dp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                            android:id="@+id/btn_filter_all"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:orientation="horizontal"
+                            android:gravity="center"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:foreground="?attr/selectableItemBackground">
+
+                        <ImageView
+                                android:id="@+id/iv_filter_all"
+                                android:layout_width="100dp"
+                                android:layout_height="100dp"
+                                android:src="@drawable/ic_filter_all"
+                                android:contentDescription="Show all transactions"
+                                android:adjustViewBounds="true"
+                                android:scaleType="fitCenter"
+                                android:padding="12dp" />
+                    </LinearLayout>
+
+
                 </LinearLayout>
 
-                <!-- Placeholder donut chart icon -->
-                <ImageView
-                        android:layout_width="80dp"
-                        android:layout_height="80dp"
-                        android:src="@android:drawable/ic_menu_report_image"
-                        android:layout_alignParentEnd="true"
-                        android:layout_centerVertical="true"
-                        android:contentDescription="Spending chart" />
+                <TextView
+                        android:id="@+id/tv_loading"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Loading transactions..."
+                        android:textColor="#888888"
+                        android:textSize="14sp"
+                        android:layout_marginTop="32dp"
+                        android:layout_marginStart="20dp"
+                        android:visibility="gone" />
 
-            </RelativeLayout>
-        </androidx.cardview.widget.CardView>
+                <TextView
+                        android:id="@+id/tv_date_range_filter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text=""
+                        android:textColor="#2E7D32"
+                        android:textSize="12sp"
+                        android:layout_marginStart="20dp"
+                        android:layout_marginTop="12dp"
+                        android:visibility="gone" />
 
-        <!-- ── TOP CATEGORIES ── -->
-        <RelativeLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingHorizontal="20dp"
-                android:layout_marginTop="24dp">
+                <LinearLayout
+                        android:id="@+id/container_transactions"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingHorizontal="20dp"
+                        android:layout_marginTop="12dp" />
 
-            <TextView
-                    android:layout_width="wrap_content"
+            </LinearLayout>
+
+            <!-- ════════════════════════════════════════════════════ -->
+            <!-- TAB 3 – MANUAL ENTRY (ADD EXPENSE / INCOME)        -->
+            <!-- ════════════════════════════════════════════════════ -->
+            <LinearLayout
+                    android:id="@+id/container_add"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Top Categories"
-                    android:textColor="#111111"
-                    android:textSize="17sp"
-                    android:textStyle="bold"
-                    android:layout_alignParentStart="true" />
+                    android:orientation="vertical"
+                    android:visibility="gone">
 
-            <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="View all"
-                    android:textColor="#888888"
-                    android:textSize="13sp"
-                    android:layout_alignParentEnd="true"
-                    android:layout_centerVertical="true" />
-        </RelativeLayout>
+                <!-- ── HEADER ── -->
+                <RelativeLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="64dp"
+                        android:paddingHorizontal="20dp"
+                        android:layout_marginTop="20dp">
 
+                    <ImageView
+                            android:id="@+id/btn_back_add"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:src="@android:drawable/ic_media_previous"
+                            android:layout_centerVertical="true"
+                            android:padding="12dp"
+                            android:contentDescription="Back" />
+
+                    <TextView
+                            android:id="@+id/tv_add_title"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Add Expense"
+                            android:textColor="#111111"
+                            android:textSize="24sp"
+                            android:textStyle="bold"
+                            android:layout_centerInParent="true" />
+                </RelativeLayout>
+
+                <!-- ── EXPENSE / INCOME TOGGLE ── -->
+                <LinearLayout
+                        android:id="@+id/toggle_container"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:layout_marginHorizontal="32dp"
+                        android:layout_marginTop="24dp"
+                        android:background="@drawable/toggle_bg"
+                        android:orientation="horizontal"
+                        android:gravity="center">
+
+                    <TextView
+                            android:id="@+id/toggle_expense"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:text="Expense"
+                            android:textColor="#E53935"
+                            android:textSize="17sp"
+                            android:textStyle="bold"
+                            android:background="@drawable/toggle_active"
+                            android:clickable="true"
+                            android:focusable="true" />
+
+                    <TextView
+                            android:id="@+id/toggle_income"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:gravity="center"
+                            android:text="Income"
+                            android:textColor="#FFFFFF"
+                            android:textSize="17sp"
+                            android:textStyle="bold"
+                            android:clickable="true"
+                            android:focusable="true" />
+
+                </LinearLayout>
+
+                <!-- ── FORM FIELDS ── -->
+                <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingHorizontal="32dp"
+                        android:layout_marginTop="32dp">
+
+                    <!-- Date -->
+                    <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Date"
+                            android:textColor="#111111"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+                    <TextView
+                            android:id="@+id/et_date"
+                            android:layout_width="match_parent"
+                            android:layout_height="56dp"
+                            android:background="@drawable/input_outline"
+                            android:hint="Pick"
+                            android:textColorHint="#F9AC54"
+                            android:textColor="#111111"
+                            android:textSize="16sp"
+                            android:paddingHorizontal="20dp"
+                            android:gravity="center_vertical"
+                            android:layout_marginTop="8dp"
+                            android:layout_marginBottom="20dp"
+                            android:clickable="true"
+                            android:focusable="true" />
+
+                    <!-- Category -->
+                    <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Category"
+                            android:textColor="#111111"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+                    <TextView
+                            android:id="@+id/et_category"
+                            android:layout_width="match_parent"
+                            android:layout_height="56dp"
+                            android:background="@drawable/input_outline"
+                            android:hint="Select"
+                            android:textColorHint="#F9AC54"
+                            android:textColor="#111111"
+                            android:textSize="16sp"
+                            android:paddingHorizontal="20dp"
+                            android:gravity="center_vertical"
+                            android:layout_marginTop="8dp"
+                            android:layout_marginBottom="20dp"
+                            android:clickable="true"
+                            android:focusable="true" />
+
+                    <!-- Amount -->
+                    <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Amount"
+                            android:textColor="#111111"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+                    <EditText
+                            android:id="@+id/et_amount"
+                            android:layout_width="match_parent"
+                            android:layout_height="56dp"
+                            android:background="@drawable/input_outline"
+                            android:hint="$"
+                            android:textColorHint="#F9AC54"
+                            android:textColor="#111111"
+                            android:textSize="16sp"
+                            android:paddingHorizontal="20dp"
+                            android:gravity="center_vertical"
+                            android:layout_marginTop="8dp"
+                            android:layout_marginBottom="20dp"
+                            android:inputType="numberDecimal" />
+
+                    <!-- Payment Method -->
+                    <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Payment Method"
+                            android:textColor="#111111"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+                    <TextView
+                            android:id="@+id/et_payment"
+                            android:layout_width="match_parent"
+                            android:layout_height="56dp"
+                            android:background="@drawable/input_outline"
+                            android:hint="Select"
+                            android:textColorHint="#F9AC54"
+                            android:textColor="#111111"
+                            android:textSize="16sp"
+                            android:paddingHorizontal="20dp"
+                            android:gravity="center_vertical"
+                            android:layout_marginTop="8dp"
+                            android:layout_marginBottom="20dp"
+                            android:clickable="true"
+                            android:focusable="true" />
+
+                    <!-- Notes -->
+                    <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Notes"
+                            android:textColor="#111111"
+                            android:textSize="15sp"
+                            android:textStyle="bold" />
+                    <EditText
+                            android:id="@+id/et_notes"
+                            android:layout_width="match_parent"
+                            android:layout_height="56dp"
+                            android:background="@drawable/input_outline"
+                            android:hint="Write"
+                            android:textColorHint="#F9AC54"
+                            android:textColor="#111111"
+                            android:textSize="16sp"
+                            android:paddingHorizontal="20dp"
+                            android:gravity="center_vertical"
+                            android:layout_marginTop="8dp"
+                            android:layout_marginBottom="32dp" />
+
+                </LinearLayout>
+
+                <!-- ── SAVE BUTTON ── -->
+                <TextView
+                        android:id="@+id/btn_save"
+                        android:layout_width="wrap_content"
+                        android:layout_height="52dp"
+                        android:layout_gravity="center"
+                        android:paddingHorizontal="48dp"
+                        android:gravity="center"
+                        android:text="save"
+                        android:textColor="#E53935"
+                        android:textSize="17sp"
+                        android:textStyle="bold"
+                        android:background="@drawable/btn_save_outline"
+                        android:clickable="true"
+                        android:focusable="true" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </androidx.core.widget.NestedScrollView>
+
+    <!-- ════════════════════════════════════════════════════ -->
+    <!-- FLOATING NAVIGATION BAR                             -->
+    <!-- ════════════════════════════════════════════════════ -->
+    <LinearLayout
+            android:id="@+id/bottom_nav"
+            android:layout_width="match_parent"
+            android:layout_height="80dp"
+            android:layout_gravity="bottom"
+            android:layout_marginHorizontal="20dp"
+            android:layout_marginBottom="20dp"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:background="@drawable/nav_bar_bg"
+            android:elevation="8dp"
+            android:paddingHorizontal="6dp"
+            android:clipToPadding="false">
+
+        <!-- Tab 1 -->
         <LinearLayout
-                android:id="@+id/container_categories"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingHorizontal="20dp"
-                android:layout_marginTop="12dp" />
+                android:id="@+id/nav_home"
+                android:layout_width="0dp"
+                android:layout_height="60dp"
+                android:layout_weight="1"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground">
 
-        <!-- ── RECENT TRANSACTIONS ── -->
-        <RelativeLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingHorizontal="20dp"
-                android:layout_marginTop="8dp">
+            <ImageView
+                    android:id="@+id/ic_nav_home"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:src="@drawable/tab_1"
+                    android:contentDescription="Tab 1" />
+        </LinearLayout>
 
-            <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Recent Transactions"
-                    android:textColor="#111111"
-                    android:textSize="17sp"
-                    android:textStyle="bold"
-                    android:layout_alignParentStart="true" />
-
-            <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="View all"
-                    android:textColor="#888888"
-                    android:textSize="13sp"
-                    android:layout_alignParentEnd="true"
-                    android:layout_centerVertical="true" />
-        </RelativeLayout>
-
-        <TextView
-                android:id="@+id/tv_loading"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Loading transactions..."
-                android:textColor="#888888"
-                android:textSize="14sp"
-                android:layout_marginTop="24dp"
-                android:layout_marginStart="20dp"
-                android:visibility="gone" />
-
+        <!-- Tab 2 -->
         <LinearLayout
-                android:id="@+id/container_transactions"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingHorizontal="20dp"
-                android:layout_marginTop="12dp" />
+                android:id="@+id/nav_document"
+                android:layout_width="0dp"
+                android:layout_height="60dp"
+                android:layout_weight="1"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground">
+
+            <ImageView
+                    android:id="@+id/ic_nav_document"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:src="@drawable/tab_2"
+                    android:contentDescription="Tab 2" />
+        </LinearLayout>
+
+        <!-- Tab 3 -->
+        <LinearLayout
+                android:id="@+id/nav_add"
+                android:layout_width="0dp"
+                android:layout_height="60dp"
+                android:layout_weight="1"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground">
+
+            <ImageView
+                    android:id="@+id/ic_nav_add"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:src="@drawable/tab_3"
+                    android:contentDescription="Tab 3" />
+        </LinearLayout>
+
+        <!-- Tab 4 -->
+        <LinearLayout
+                android:id="@+id/nav_gallery"
+                android:layout_width="0dp"
+                android:layout_height="60dp"
+                android:layout_weight="1"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground">
+
+            <ImageView
+                    android:id="@+id/ic_nav_gallery"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:src="@drawable/tab_4"
+                    android:contentDescription="Tab 4" />
+        </LinearLayout>
+
+        <!-- Tab 5 -->
+        <LinearLayout
+                android:id="@+id/nav_settings"
+                android:layout_width="0dp"
+                android:layout_height="60dp"
+                android:layout_weight="1"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground">
+
+            <ImageView
+                    android:id="@+id/ic_nav_settings"
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:src="@drawable/tab_5"
+                    android:contentDescription="Tab 5" />
+        </LinearLayout>
 
     </LinearLayout>
 
-</androidx.core.widget.NestedScrollView>
+</FrameLayout>

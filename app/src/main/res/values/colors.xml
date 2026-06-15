@@ -21,4 +21,8 @@
     <color name="red_spending">#E53935</color>
     <color name="orange_badge">#FFA726</color>
     <color name="blue_income">#1E88E5</color>
+
+    <color name="nav_active_bg">#F9AC54</color>
+    <color name="nav_inactive_icon">#F9AC54</color>
+    <color name="nav_inactive_border">#F9AC54</color>
 </resources>

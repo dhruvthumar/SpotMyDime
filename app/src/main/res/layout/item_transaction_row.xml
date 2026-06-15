@@ -12,13 +12,12 @@
             android:id="@+id/tv_avatar"
             android:layout_width="44dp"
             android:layout_height="44dp"
-            android:text="A"
-            android:textColor="@color/white"
-            android:textSize="18sp"
-            android:gravity="center"
             android:background="@drawable/circle_dark"
-            android:fontFamily="@font/google_sans_flex_24pt"
-            android:fontWeight="600" />
+            android:text="A"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:textSize="16sp" />
 
     <LinearLayout
             android:layout_width="0dp"
@@ -50,7 +49,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:gravity="end">
+            android:gravity="end|center_vertical">
 
         <TextView
                 android:id="@+id/tv_amount"
@@ -66,14 +65,15 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Shopping"
-                android:textColor="@color/white"
+                android:textColor="#FFFFFF"
                 android:textSize="11sp"
-                android:paddingHorizontal="10dp"
-                android:paddingVertical="3dp"
+                android:paddingLeft="8dp"
+                android:paddingRight="8dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:layout_marginTop="6dp"
                 android:background="@drawable/badge_shopping"
-                android:layout_marginTop="4dp"
-                android:fontFamily="@font/google_sans_flex_9pt"
-                android:fontWeight="500" />
+                android:gravity="center" />
     </LinearLayout>
 
 </LinearLayout>

@@ -52,8 +52,9 @@ public class GeminiClassifier {
                 + "  snippet: optional short preview of the email body\n"
                 + "Instructions:\n"
                 + "  1) If the email is a transactional/receipt/payment notification, output a JSON object EXACTLY in this format (only JSON, no extra commentary):\n"
-                + "     {\"category\":\"<one of: Food & Dining, Shopping, Subscriptions, Transportation, Bills & Utilities, Entertainment, Health, Other>\",\"vendor\":\"<vendor name or empty>\",\"amount\":\"<numeric amount like 59.23 or empty>\"}\n"
-                + "  2) If the email is NOT transactional, set category to \"Other\" and vendor/amount to empty strings.\n"
+                + "     {\"category\":\"<one of: Food & Dining, Shopping, Subscriptions, Transportation, Bills & Utilities, Entertainment, Health, Interac Sent, Interac Received, Other>\",\"vendor\":\"<vendor name or empty>\",\"amount\":\"<numeric amount like 59.23 or empty>\",\"type\":\"<incoming or outgoing>\"}\n"
+                + "  2) If the email is NOT transactional, set category to \"Other\", vendor/amount to empty strings, and type to \"outgoing\".\n"
+                + "  3) type must be \"outgoing\" when money leaves the user's account (purchases, bills, payments), or \"incoming\" when money comes in (refunds, deposits, cashback, reimbursements).\n"
                 + "Now classify the following email:\n"
                 + "subject: \"" + (subject != null ? subject.replace("\"", "\\\"") : "") + "\"\n"
                 + "snippet: \"" + (snippet != null ? snippet.replace("\"", "\\\"") : "") + "\"\n";
@@ -97,6 +98,7 @@ public class GeminiClassifier {
             {"bill", "Bills & Utilities"}, {"utilities", "Bills & Utilities"}, {"bills", "Bills & Utilities"},
             {"netflix", "Entertainment"}, {"spotify", "Entertainment"}, {"entertain", "Entertainment"},
             {"health", "Health"}, {"doctor", "Health"},
+            {"interac e-transfer", "Other"},
         };
 
         for (String[] c : checks) {
@@ -194,6 +196,7 @@ public class GeminiClassifier {
                     String category = out.optString("category", "Other");
                     String vendor = out.optString("vendor", "");
                     String amountStr = out.optString("amount", "");
+                    String type = out.optString("type", null);
                     Double amount = null;
                     if (!amountStr.isEmpty()) {
                         try {
@@ -201,7 +204,7 @@ public class GeminiClassifier {
                         } catch (Exception ignore) {
                         }
                     }
-                    return new ClassificationResult(category, vendor, amount);
+                    return new ClassificationResult(category, vendor, amount, type);
                 } catch (Exception je) {
                     Log.w(TAG, "Failed to parse JSON from model text", je);
                 }

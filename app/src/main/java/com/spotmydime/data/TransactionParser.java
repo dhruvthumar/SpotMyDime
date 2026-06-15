@@ -168,7 +168,7 @@ public class TransactionParser {
         char avatar = merchant.charAt(0);
         String dateDisplay = formatDate(internalDate);
 
-        return new Transaction(merchant, amount, internalDate, dateDisplay, category, avatar);
+        return new Transaction(merchant, amount, internalDate, dateDisplay, category, avatar, Transaction.Type.OUTGOING);
     }
 
     private static boolean isLikelyTransaction(String lcSubject, String lcSnippet, String lcBody) {

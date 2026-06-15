@@ -1,6 +1,8 @@
 package com.spotmydime.data;
 
+import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.util.Base64;
 import android.util.Log;
 
@@ -38,6 +40,8 @@ public class GmailFetcher {
                     "(?:total|amount|paid|charged|due|cost|price|spent|payment|sale|balance|fee|subtotal|grand total|sum)\\s*[:\\s]*\\$?\\s*[0-9]+(?:[,.][0-9]+)*",
                     Pattern.CASE_INSENSITIVE);
 
+    public static final int REQUEST_AUTH = 1001;
+
     public interface Callback {
         void onResult(List<Transaction> transactions);
         void onError(String message);
@@ -59,15 +63,24 @@ public class GmailFetcher {
                             account.getAccount(),
                             SCOPE
                     );
+                } catch (com.google.android.gms.auth.UserRecoverableAuthException e) {
+                    Log.e(TAG, "Auth requires user action", e);
+                    if (context instanceof Activity) {
+                        ((Activity) context).startActivityForResult(e.getIntent(), REQUEST_AUTH);
+                    } else {
+                        Intent recoverIntent = e.getIntent();
+                        recoverIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        context.startActivity(recoverIntent);
+                    }
+                    callback.onError("Authorization required.");
+                    return;
                 } catch (Exception e) {
                     Log.e(TAG, "Auth token error", e);
                     callback.onError("Failed to get Gmail access token: " + e.getClass().getSimpleName());
                     return;
                 }
 
-                long oneMonthAgo = System.currentTimeMillis() - 60L * 24 * 60 * 60 * 1000;
-                String dateStr = new SimpleDateFormat("yyyy/MM/dd", Locale.US)
-                        .format(new Date(oneMonthAgo));
+                String dateStr = "2026/01/01";
 
                 // Gmail search query: only get emails that contain monetary signals
                 String query = "after:" + dateStr
@@ -75,7 +88,7 @@ public class GmailFetcher {
                         + " OR \"order confirmation\" OR \"your order\" OR \"payment received\")";
 
                 String listUrl = GMAIL_API + "/messages?q="
-                        + java.net.URLEncoder.encode(query, "UTF-8") + "&maxResults=30";
+                        + java.net.URLEncoder.encode(query, "UTF-8") + "&maxResults=500";
 
                 String listJson = executeGet(listUrl, token);
 
@@ -91,7 +104,7 @@ public class GmailFetcher {
                 Log.d(TAG, "Found " + messages.length() + " matching messages");
 
                 List<Transaction> results = new ArrayList<>();
-                int max = Math.min(messages.length(), 20);
+                int max = Math.min(messages.length(), 200);
                 VendorStore vendorStore = new VendorStore(context);
 
                 for (int i = 0; i < max; i++) {
@@ -184,11 +197,34 @@ public class GmailFetcher {
         String dateDisplay = sdf.format(new Date(internalDate));
 
         String vendor = extractVendorName(from);
-        String merchant = subject.isEmpty() ? "(no subject)" : subject;
+        String merchant = (vendor != null && !vendor.isEmpty()) ? vendor : subject;
 
         // Extract the full body early so the classifier can inspect it when
         // deciding whether this is a transactional message.
         String fullBody = extractBodyText(payload);
+
+        // ── Interac e-Transfer detection ──
+        if (subject != null && subject.contains("Interac e-Transfer")) {
+            String cat;
+            Transaction.Type txnType;
+            if (subject.contains("transfer to")) {
+                cat = "Interac Sent";
+                txnType = Transaction.Type.OUTGOING;
+            } else {
+                cat = "Interac Received";
+                txnType = Transaction.Type.INCOMING;
+            }
+
+            String searchText = subject + "\n" + (fullBody.isEmpty() ? snippet : fullBody);
+            double amount = TransactionParser.extractAmount(searchText);
+
+            char avatar = from.isEmpty() ? '?' : from.trim().charAt(0);
+            if (avatar >= 'a' && avatar <= 'z') avatar = (char) (avatar - 32);
+
+            Log.d(TAG, "Interac: " + cat + " | $" + amount + " | " + txnType);
+            return new Transaction(merchant, amount, internalDate, dateDisplay, cat, avatar, txnType,
+                    extractEmailFromHeader(from), subject);
+        }
 
         // Determine if this looks like a transactional email first. If not, skip
         // calling the remote classifier and mark as Other. If vendor already has
@@ -201,14 +237,15 @@ public class GmailFetcher {
         boolean isTxn = com.spotmydime.ai.TransactionClassifier.isTransactional(subject, snippet, fullBody);
 
         Double modelAmount = null;
+        com.spotmydime.ai.ClassificationResult res = null;
 
         if (category == null) {
             if (!isTxn) {
-                // Not a transactional message according to simple heuristics
-                category = "Other";
+                // Not a transactional message — guess from vendor name
+                category = guessCategoryFallback(vendor, subject);
             } else {
                 // Call the AI classifier and accept its structured output
-                com.spotmydime.ai.ClassificationResult res = GeminiClassifier.classifyFull(vendor, subject, snippet);
+                res = GeminiClassifier.classifyFull(vendor, subject, snippet);
                 if (res != null) {
                     category = res.category == null ? "Other" : res.category;
                     // If the model extracted a vendor, prefer it (useful when subject
@@ -227,8 +264,8 @@ public class GmailFetcher {
                         Log.d(TAG, "Learned: " + vendor + " → " + category);
                     }
                 } else {
-                    // If the model failed, fall back to Other
-                    category = "Other";
+                    // If the model failed, guess category from vendor name
+                    category = guessCategoryFallback(vendor, subject);
                 }
             }
         }
@@ -242,9 +279,90 @@ public class GmailFetcher {
         char avatar = from.isEmpty() ? '?' : from.trim().charAt(0);
         if (avatar >= 'a' && avatar <= 'z') avatar = (char) (avatar - 32);
 
-        Log.d(TAG, "From: " + from + " | Vendor: " + vendor + " | Category: " + category + " | $" + amount);
+        Transaction.Type type = classifyType(subject, snippet, fullBody, vendor);
+        if (res != null && res.type != null) {
+            type = "incoming".equalsIgnoreCase(res.type)
+                    ? Transaction.Type.INCOMING : Transaction.Type.OUTGOING;
+        }
 
-        return new Transaction(merchant, amount, internalDate, dateDisplay, category, avatar);
+        Log.d(TAG, "From: " + from + " | Vendor: " + vendor + " | Category: " + category
+                + " | $" + amount + " | " + type);
+
+        return new Transaction(merchant, amount, internalDate, dateDisplay, category, avatar, type,
+                extractEmailFromHeader(from), subject);
+    }
+
+    private static String guessCategoryFallback(String vendor, String subject) {
+        String text = ((vendor != null ? vendor : "") + " " + subject).toLowerCase(Locale.US);
+
+        String[][] rules = {
+            {"food", "Food & Dining"}, {"dining", "Food & Dining"}, {"restaurant", "Food & Dining"},
+            {"ubereats", "Food & Dining"}, {"doordash", "Food & Dining"}, {"starbucks", "Food & Dining"},
+            {"mcdonald", "Food & Dining"}, {"chipotle", "Food & Dining"}, {"subway", "Food & Dining"},
+            {"pizza hut", "Food & Dining"}, {"domino", "Food & Dining"}, {"kfc", "Food & Dining"},
+            {"taco bell", "Food & Dining"}, {"burger king", "Food & Dining"}, {"wendy", "Food & Dining"},
+            {"dunkin", "Food & Dining"}, {"popeyes", "Food & Dining"}, {"tim horton", "Food & Dining"},
+
+            {"amazon", "Shopping"}, {"walmart", "Shopping"}, {"target", "Shopping"},
+            {"costco", "Shopping"}, {"best buy", "Shopping"}, {"nike", "Shopping"},
+            {"ebay", "Shopping"}, {"etsy", "Shopping"}, {"ikea", "Shopping"},
+            {"home depot", "Shopping"}, {"lowes", "Shopping"}, {"shopify", "Shopping"},
+            {"adidas", "Shopping"}, {"h&m", "Shopping"}, {"zara", "Shopping"},
+            {"gap", "Shopping"}, {"old navy", "Shopping"}, {"cvs", "Shopping"},
+            {"walgreens", "Shopping"}, {"wish", "Shopping"},
+
+            {"netflix", "Subscriptions"}, {"spotify", "Subscriptions"}, {"hbo", "Subscriptions"},
+            {"disney", "Subscriptions"}, {"hulu", "Subscriptions"}, {"patreon", "Subscriptions"},
+            {"discord", "Subscriptions"}, {"twitch", "Subscriptions"},
+
+            {"uber", "Transportation"}, {"lyft", "Transportation"}, {"shell", "Transportation"},
+            {"esso", "Transportation"}, {"petro", "Transportation"}, {"bp", "Transportation"},
+            {"chevron", "Transportation"}, {"exxon", "Transportation"}, {"mobil", "Transportation"},
+            {"southwest", "Transportation"}, {"delta", "Transportation"}, {"united", "Transportation"},
+
+            {"airbnb", "Travel"}, {"expedia", "Travel"}, {"booking", "Travel"},
+
+            {"apple", "Entertainment"}, {"steam", "Entertainment"},
+            {"microsoft", "Entertainment"}, {"google", "Entertainment"},
+
+            {"paypal", "Transfers"}, {"venmo", "Transfers"}, {"stripe", "Transfers"},
+
+            {"bell", "Bills & Utilities"}, {"rogers", "Bills & Utilities"}, {"telus", "Bills & Utilities"},
+            {"hydro", "Bills & Utilities"}, {"electric", "Bills & Utilities"},
+            {"internet", "Bills & Utilities"}, {"phone", "Bills & Utilities"},
+        };
+
+        for (String[] r : rules) {
+            if (text.contains(r[0])) return r[1];
+        }
+
+        return "Other";
+    }
+
+    private static Transaction.Type classifyType(String subject, String snippet,
+                                                   String fullBody, String vendor) {
+        String text = (subject + " " + snippet + " " + fullBody).toLowerCase(Locale.US);
+
+        if (text.contains("refund") || text.contains("cashback")
+                || text.contains("deposit") || text.contains("payment received")
+                || text.contains("you received") || text.contains("credit")
+                || text.contains("money received") || text.contains("sent you")
+                || text.contains("paid you") || text.contains("reimbursement")
+                || text.contains("return") || text.contains("income")
+                || text.contains("paypal deposit") || text.contains("direct deposit")
+                || text.contains("interest") || text.contains("cash back")
+                || text.contains("credit card payment received")
+                || (text.contains("interac e-transfer")
+                        && (text.contains("you've received")
+                        || (text.contains("received") && text.contains("from"))))) {
+            return Transaction.Type.INCOMING;
+        }
+
+        if (text.contains("interac e-transfer") && text.contains("transfer to")) {
+            return Transaction.Type.OUTGOING;
+        }
+
+        return Transaction.Type.OUTGOING;
     }
 
     private static String extractVendorName(String from) {
@@ -264,6 +382,18 @@ public class GmailFetcher {
             return domain.substring(0, 1).toUpperCase(Locale.US) + domain.substring(1);
         }
         return email.isEmpty() ? null : email;
+    }
+
+    private static String extractEmailFromHeader(String from) {
+        if (from == null || from.isEmpty()) return null;
+        int start = from.indexOf('<');
+        int end = from.indexOf('>');
+        if (start >= 0 && end > start) {
+            return from.substring(start + 1, end).trim();
+        }
+        String trimmed = from.trim();
+        if (trimmed.contains("@")) return trimmed;
+        return null;
     }
 
     private static String extractBodyText(JSONObject payload) throws Exception {
