@@ -16,7 +16,7 @@ public class GeminiClassifier {
     private static final String TAG = "GeminiClassifier";
     private static final String MODEL = "gemini-2.0-flash";
     private static final String API_URL =
-            "https://generativelanguage.googleapis.com/v1/models/" + MODEL + ":generateContent?key=";
+            "https://generativelanguage.googleapis.com/v1beta/models/" + MODEL + ":generateContent?key=";
 
     public static String apiKey = "";
 
@@ -49,7 +49,9 @@ public class GeminiClassifier {
                 + "     {\"category\":\"<one of: Food & Dining, Shopping, Subscriptions, Transportation, Bills & Utilities, Entertainment, Health, Interac Sent, Interac Received, Other>\",\"vendor\":\"<vendor name or empty>\",\"amount\":\"<numeric amount like 59.23 or empty>\",\"type\":\"<incoming or outgoing>\"}\n"
                 + "  2) If the email is NOT transactional, set category to \"Other\", vendor/amount to empty strings, and type to \"outgoing\".\n"
                 + "  3) type must be \"outgoing\" when money leaves the user's account (purchases, bills, payments), or \"incoming\" when money comes in (refunds, deposits, cashback, reimbursements).\n"
-                + "  4) Only classify an email as a transaction if it contains a specific dollar amount and merchant name. Ignore informational/digest emails.\n"
+                + "  4) CRITICAL: Emails about credit card payments, loan payments, or mortgage payments (e.g. \"payment received for your credit card\", \"credit card payment confirmation\") are OUTGOING — the user is sending money to pay their bill. Do NOT classify these as incoming.\n"
+                + "  5) Emails about refunds, cashback, deposits, or money being sent TO the user are INCOMING.\n"
+                + "  6) Only classify an email as a transaction if it contains a specific dollar amount and merchant name. Ignore informational/digest emails.\n"
                 + "Now classify the following email:\n"
                 + "subject: \"" + (subject != null ? subject.replace("\"", "\\\"") : "") + "\"\n"
                 + "body: \"" + body.replace("\"", "\\\"") + "\"\n";

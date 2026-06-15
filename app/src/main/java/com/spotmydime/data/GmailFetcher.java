@@ -374,23 +374,31 @@ public class GmailFetcher {
                                                    String fullBody, String vendor) {
         String text = (subject + " " + snippet + " " + fullBody).toLowerCase(Locale.US);
 
+        // ── Credit card / loan / mortgage payments: user sending money OUT ──
+        if (text.contains("credit card") || text.contains("card payment")
+                || text.contains("mortgage payment") || text.contains("loan payment")) {
+            if (text.contains("payment received") || text.contains("payment of")
+                    || text.contains("you made a payment") || text.contains("your payment")
+                    || text.contains("statement") || text.contains("autopay")
+                    || text.contains("scheduled payment") || text.contains("minimum payment")) {
+                return Transaction.Type.OUTGOING;
+            }
+        }
+
+        // ── Genuinely incoming signals ──
         if (text.contains("refund") || text.contains("cashback")
-                || text.contains("deposit") || text.contains("payment received")
-                || text.contains("you received") || text.contains("credit")
+                || text.contains("deposit") || text.contains("you received")
                 || text.contains("money received") || text.contains("sent you")
                 || text.contains("paid you") || text.contains("reimbursement")
-                || text.contains("return") || text.contains("income")
+                || text.contains("income") || text.contains("cash back")
                 || text.contains("paypal deposit") || text.contains("direct deposit")
-                || text.contains("interest") || text.contains("cash back")
-                || text.contains("credit card payment received")
+                || text.contains("interest")
+                || vendor != null && (vendor.toLowerCase().contains("payroll")
+                        || vendor.toLowerCase().contains("employer"))
                 || (text.contains("interac e-transfer")
                         && (text.contains("you've received")
                         || (text.contains("received") && text.contains("from"))))) {
             return Transaction.Type.INCOMING;
-        }
-
-        if (text.contains("interac e-transfer") && text.contains("transfer to")) {
-            return Transaction.Type.OUTGOING;
         }
 
         return Transaction.Type.OUTGOING;

@@ -1,33 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.GET_ACCOUNTS" />
+        <uses-permission android:name="android.permission.INTERNET" />
+        <uses-permission android:name="android.permission.GET_ACCOUNTS" />
 
-    <application
-            android:allowBackup="true"
-            android:label="@string/app_name"
-            android:supportsRtl="true"
-            android:theme="@style/Theme.SpotMyDime">
+        <application
+                android:allowBackup="true"
+                android:label="@string/app_name"
+                android:supportsRtl="true"
+                android:theme="@style/Theme.SpotMyDime">
 
-        <activity
-                android:name=".ui.onboarding.OnboardingActivity"
-                android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+            <activity
+                    android:name=".ui.onboarding.OnboardingActivity"
+                    android:exported="true">
+                <intent-filter>
+                    <action android:name="android.intent.action.MAIN" />
+                    <category android:name="android.intent.category.LAUNCHER" />
+                </intent-filter>
+            </activity>
 
-        <activity
-                android:name=".ui.onboarding.ConnectGmailActivity"
-                android:exported="false" />
+            <activity
+                    android:name=".ui.onboarding.ConnectGmailActivity"
+                    android:exported="false" />
 
-        <!-- Dashboard — destination after OAuth -->
-        <activity
-                android:name=".ui.onboarding.HomeActivity"
-                android:exported="false" />
+            <!-- Dashboard — destination after OAuth -->
+            <activity
+                    android:name=".ui.onboarding.HomeActivity"
+                    android:exported="false" />
 
-    </application>
+        </application>
 
-</manifest>
+    </manifest>
