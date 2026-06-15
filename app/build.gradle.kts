@@ -35,6 +35,7 @@ dependencies {
     implementation("androidx.activity:activity:1.8.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
 
+    implementation("androidx.cardview:cardview:1.0.0")
     // Google Sign-In — handles the entire OAuth 2.0 flow
     implementation("com.google.android.gms:play-services-auth:21.2.0")
 

@@ -1,9 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Required to call Google's OAuth servers -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- Required to list Google accounts on the device -->
     <uses-permission android:name="android.permission.GET_ACCOUNTS" />
 
     <application
@@ -12,9 +10,8 @@
             android:supportsRtl="true"
             android:theme="@style/Theme.SpotMyDime">
 
-        <!-- Screen 1: First thing user sees when app opens -->
         <activity
-                android:name=".ui.OnboardingActivity"
+                android:name=".ui.onboarding.OnboardingActivity"
                 android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -22,9 +19,13 @@
             </intent-filter>
         </activity>
 
-        <!-- Screen 2: Gmail permission explainer + OAuth trigger -->
         <activity
-                android:name=".ui.ConnectGmailActivity"
+                android:name=".ui.onboarding.ConnectGmailActivity"
+                android:exported="false" />
+
+        <!-- Dashboard — destination after OAuth -->
+        <activity
+                android:name=".ui.onboarding.HomeActivity"
                 android:exported="false" />
 
     </application>

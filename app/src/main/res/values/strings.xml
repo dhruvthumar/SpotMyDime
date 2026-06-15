@@ -1,3 +1,34 @@
 <resources>
     <string name="app_name">SpotMyDime</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_tagline">Your Gmail. Your Spending.\nAll in one place.</string>
+    <string name="onboarding_desc">We read your transaction emails and turn them into powerful spending insights.</string>
+    <string name="onboarding_feature_1">No bank login</string>
+    <string name="onboarding_feature_2">No manual entry</string>
+    <string name="onboarding_feature_3">100%% private &amp; local</string>
+    <string name="onboarding_cta">Let\'s Go</string>
+
+    <!-- Connect Gmail -->
+    <string name="connect_desc">SpotMyDime needs access to your Gmail to read transaction emails.</string>
+    <string name="connect_trust_1_title">Read-only access</string>
+    <string name="connect_trust_1_sub">No sending, deleting or managing your emails</string>
+    <string name="connect_trust_2_title">Your data stays on your device</string>
+    <string name="connect_trust_2_sub">Everything is stored locally on your phone</string>
+    <string name="connect_trust_3_title">You have full control</string>
+    <string name="connect_trust_3_sub">You can disconnect anytime</string>
+    <string name="connect_cta">Connect Gmail</string>
+    <string name="connect_privacy">Privacy &amp; Policy</string>
+
+    <!-- Home -->
+    <string name="home_greeting">Hi there</string>
+    <string name="home_this_month">This Month</string>
+    <string name="home_net_cashflow">Net Cash Flow</string>
+    <string name="home_trend_up">↑ %d%% vs last month</string>
+    <string name="home_growth_percentage">↑ 12% vs last month</string>
+    <string name="home_top_categories">Top Categories</string>
+    <string name="home_view_all">View all</string>
+    <string name="home_recent_transactions">Recent Transactions</string>
+    <!-- Placeholder for Google Generative API key (leave empty in source control) -->
+    <string name="generative_api_key"></string>
 </resources>

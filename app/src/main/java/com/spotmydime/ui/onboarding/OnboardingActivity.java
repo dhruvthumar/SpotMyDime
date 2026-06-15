@@ -1,4 +1,4 @@
-package com.spotmydime.ui;
+package com.spotmydime.ui.onboarding;
 
 import android.content.Intent;
 import android.graphics.Color;
@@ -12,33 +12,34 @@ import android.widget.TextView;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.android.gms.auth.api.signin.GoogleSignIn;
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.spotmydime.R;
 
-/**
- * OnboardingActivity — the very first screen the user sees.
- *
- * What it does:
- * 1. Shows the SpotMyDime branding with two-colour title
- * 2. Shows 3 feature points (no bank login, no manual entry, private)
- * 3. "Let's Connect" button takes user to the Gmail permission screen
- *
- * No logic here beyond navigation — this is purely a marketing/intro screen.
- */
 public class OnboardingActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(this);
+        if (account != null) {
+            Intent intent = new Intent(this, HomeActivity.class);
+            intent.putExtra("user_name", account.getDisplayName());
+            intent.putExtra("user_email", account.getEmail());
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(intent);
+            finish();
+            return;
+        }
+
         setContentView(R.layout.activity_onboarding);
 
-        // Apply two-colour styling to "SpotMyDime"
-        // "SpotMy" = black, "Dime" = green
         applyTwoColorTitle();
 
-        // Tap "Let's Connect" → go to Screen 2
         Button btnConnect = findViewById(R.id.btn_lets_connect);
         btnConnect.setOnClickListener(v -> {
-            Intent intent = new Intent(OnboardingActivity.this, ConnectGmailActivity.class);
+            Intent intent = new Intent(this, ConnectGmailActivity.class);
             startActivity(intent);
         });
     }

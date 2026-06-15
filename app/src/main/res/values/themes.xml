@@ -1,8 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
     <style name="Base.Theme.SpotMyDime" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your light theme here. -->
-        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+        <item name="colorPrimary">@color/green_primary</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorPrimaryContainer">@color/green_surface</item>
+        <item name="colorOnPrimaryContainer">@color/green_dark</item>
+        <item name="colorSecondary">@color/green_light</item>
+        <item name="colorSurface">@color/cream_bg</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorOnSurfaceVariant">@color/text_secondary</item>
+        <item name="colorOutline">@color/text_placeholder</item>
+        <item name="android:statusBarColor">@color/cream_bg</item>
+        <item name="android:navigationBarColor">@color/cream_bg</item>
+        <item name="android:fontFamily">@font/google_sans_flex_24pt</item>
     </style>
 
     <style name="Theme.SpotMyDime" parent="Base.Theme.SpotMyDime"/>
