@@ -20,12 +20,15 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
 import com.spotmydime.R;
+import com.spotmydime.ai.GeminiClassifier;
 import com.spotmydime.data.GmailFetcher;
 import com.spotmydime.data.ManualTransactionStore;
 import com.spotmydime.data.Transaction;
 import com.spotmydime.data.TransactionParser;
 import com.spotmydime.data.VendorStore;
 import com.spotmydime.data.ExcludedMessageStore;
+import com.spotmydime.data.VendorAliasStore;
+import com.spotmydime.data.TransactionOverrideStore;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -59,6 +62,7 @@ public class HomeActivity extends AppCompatActivity {
 
     private EditText etSearch;
     private ExcludedMessageStore excludedStore;
+    private VendorAliasStore aliasStore;
 
     // Manual entry
     private LinearLayout containerAdd;
@@ -92,6 +96,9 @@ public class HomeActivity extends AppCompatActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
+
+        // Initialize the Gemini AI API key from resources
+        GeminiClassifier.apiKey = getString(R.string.generative_api_key);
 
         String userName = getIntent().getStringExtra("user_name");
         String userEmail = getIntent().getStringExtra("user_email");
@@ -128,6 +135,7 @@ public class HomeActivity extends AppCompatActivity {
         });
 
         excludedStore = new ExcludedMessageStore(this);
+        aliasStore = new VendorAliasStore(this);
 
         manualStore = new ManualTransactionStore(this);
 
@@ -166,15 +174,20 @@ public class HomeActivity extends AppCompatActivity {
     }
 
     private int getCategoryColor(String cat) {
-        if (cat == null) return 0xFF424242;
+        if (cat == null) return 0xFF757575;
         switch (cat.toLowerCase()) {
-            case "shopping": return 0xFFFFA726; // orange
-            case "transport":
-            case "transportation": return 0xFFE53935; // red
-            case "food": return 0xFF29B6F6; // blue/teal
-            case "grocery": return 0xFF4CAF50; // green
-            case "entertainment": return 0xFF8E24AA; // purple
-            default: return 0xFF424242; // dark gray/black
+            case "food & dining": return 0xFF29B6F6;
+            case "shopping": return 0xFFFFA726;
+            case "subscriptions": return 0xFF8E24AA;
+            case "transportation": return 0xFFE53935;
+            case "bills & utilities": return 0xFF5C6BC0;
+            case "entertainment": return 0xFF26A69A;
+            case "health": return 0xFF4CAF50;
+            case "interac sent": return 0xFFEF5350;
+            case "interac received": return 0xFF66BB6A;
+            case "transfers": return 0xFF42A5F5;
+            case "travel": return 0xFFFF7043;
+            default: return 0xFF757575;
         }
     }
 
@@ -228,7 +241,19 @@ public class HomeActivity extends AppCompatActivity {
                     merged.addAll(manual);
                     merged.addAll(transactions);
                     merged.sort((a, b) -> Long.compare(b.getDateMillis(), a.getDateMillis()));
-                    allTransactions = merged;
+
+                    // Deduplicate: same sender/merchant + same date + same amount = duplicate
+                    Set<String> seen = new HashSet<>();
+                    List<Transaction> deduped = new ArrayList<>();
+                    for (Transaction tx : merged) {
+                        String dedupKey = (tx.getSenderEmail() != null ? tx.getSenderEmail() : tx.getMerchant())
+                                + "|" + tx.getDateMillis() + "|" + tx.getAmount();
+                        if (!seen.contains(dedupKey)) {
+                            seen.add(dedupKey);
+                            deduped.add(tx);
+                        }
+                    }
+                    allTransactions = deduped;
                     if (merged.isEmpty()) {
                         addEmptyState();
                     } else {
@@ -363,12 +388,25 @@ public class HomeActivity extends AppCompatActivity {
             ((TextView) row.findViewById(R.id.tv_date)).setText(t.getDateDisplay());
             ((TextView) row.findViewById(R.id.tv_amount)).setText(TransactionParser.formatAmount(t.getAmount()));
 
+            TextView tvArrow = row.findViewById(R.id.tv_arrow);
+            boolean isInc = t.getType() == Transaction.Type.INCOMING;
+            tvArrow.setText(isInc ? "▲" : "▼");
+            tvArrow.setTextColor(isInc ? 0xFF4CAF50 : 0xFFE53935);
+            tvArrow.setVisibility(View.VISIBLE);
+
             TextView badge = row.findViewById(R.id.tv_category_badge);
             String cat = t.getCategory() != null ? t.getCategory() : "Other";
             badge.setText(cat);
-            // set badge tint based on category
             int color = getCategoryColor(cat);
             if (badge.getBackground() != null) badge.getBackground().setTint(color);
+
+            // Show "Manual" tag for manual entries
+            TextView tvManualTag = row.findViewById(R.id.tv_manual_tag);
+            boolean isManual = t.getMessageId() != null && t.getMessageId().startsWith("manual_");
+            tvManualTag.setVisibility(isManual ? View.VISIBLE : View.GONE);
+            if (isManual && tvManualTag.getBackground() != null) {
+                tvManualTag.getBackground().setTint(0xFF9E9E9E);
+            }
 
             final Transaction tapped = t;
             row.setOnClickListener(v -> showTransactionDetail(tapped));
@@ -388,51 +426,134 @@ public class HomeActivity extends AppCompatActivity {
         int bgColor = 0xFFF5F0E8;
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(40, 24, 40, 24);
+        layout.setPadding(40, 32, 40, 32);
         layout.setBackgroundColor(bgColor);
 
-        // Read-only info rows
+        // ── Read-only info rows ──
         addDetailRow(layout, "Email", email);
-        addDetailRow(layout, "Amount", TransactionParser.formatAmount(t.getAmount()));
+        addDetailRowSpacer(layout);
         addDetailRow(layout, "Date", t.getDateDisplay());
-        addDetailRow(layout, "Type", t.getType() == Transaction.Type.INCOMING ? "Incoming" : "Outgoing");
+        addDetailRowSpacer(layout);
         addDetailRow(layout, "Subject", subject);
+        addDetailRowSpacer(layout);
+        addDetailRowSpacer(layout);
 
-        // Divider
+        // ── Divider ──
         View divider = new View(this);
         divider.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 1));
         divider.setBackgroundColor(0xFFE0D5C0);
-        divider.setPadding(0, 12, 0, 12);
         layout.addView(divider);
+        addDetailRowSpacer(layout);
+
+        // ── Editable Amount ──
+        TextView tvAmountLabel = new TextView(this);
+        tvAmountLabel.setText("Amount");
+        tvAmountLabel.setTextSize(13);
+        tvAmountLabel.setTextColor(0xFF888888);
+        tvAmountLabel.setTypeface(null, android.graphics.Typeface.BOLD);
+        layout.addView(tvAmountLabel);
+
+        EditText etEditAmount = new EditText(this);
+        etEditAmount.setText(String.valueOf(t.getAmount()));
+        etEditAmount.setTextSize(17);
+        etEditAmount.setTextColor(0xFF111111);
+        etEditAmount.setBackgroundResource(R.drawable.input_outline);
+        etEditAmount.setPadding(18, 14, 18, 14);
+        etEditAmount.setInputType(android.text.InputType.TYPE_CLASS_NUMBER
+                | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        etEditAmount.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        layout.addView(etEditAmount);
+        addDetailRowSpacer(layout);
+
+        // ── Editable Type ──
+        TextView tvTypeLabel = new TextView(this);
+        tvTypeLabel.setText("Type");
+        tvTypeLabel.setTextSize(13);
+        tvTypeLabel.setTextColor(0xFF888888);
+        tvTypeLabel.setTypeface(null, android.graphics.Typeface.BOLD);
+        layout.addView(tvTypeLabel);
+
+        final Transaction.Type[] selectedType = {t.getType()};
+        final boolean isGmail = t.getMessageId() != null && !t.getMessageId().startsWith("manual_");
+
+        // Segment control for expense/income
+        LinearLayout segmentRow = new LinearLayout(this);
+        segmentRow.setOrientation(LinearLayout.HORIZONTAL);
+        segmentRow.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 52));
+        segmentRow.setBackgroundResource(R.drawable.toggle_bg);
+
+        final int colorExpense = 0xFFE53935;
+        final int colorIncome = 0xFF4CAF50;
+        final int colorBlack = 0xFF111111;
+
+        TextView segExpense = new TextView(this);
+        segExpense.setText("Expense");
+        segExpense.setTextSize(15);
+        segExpense.setTypeface(null, android.graphics.Typeface.BOLD);
+        segExpense.setGravity(android.view.Gravity.CENTER);
+        segExpense.setLayoutParams(new LinearLayout.LayoutParams(0, 52, 1f));
+
+        TextView segIncome = new TextView(this);
+        segIncome.setText("Income");
+        segIncome.setTextSize(15);
+        segIncome.setTypeface(null, android.graphics.Typeface.BOLD);
+        segIncome.setGravity(android.view.Gravity.CENTER);
+        segIncome.setLayoutParams(new LinearLayout.LayoutParams(0, 52, 1f));
+
+        Runnable applySegments = () -> {
+            boolean isExp = selectedType[0] == Transaction.Type.OUTGOING;
+            segExpense.setBackgroundResource(isExp ? R.drawable.toggle_active : 0);
+            segIncome.setBackgroundResource(isExp ? 0 : R.drawable.toggle_active);
+            segExpense.setTextColor(isExp ? colorExpense : colorBlack);
+            segIncome.setTextColor(isExp ? colorBlack : colorIncome);
+        };
+        applySegments.run();
+
+        segExpense.setOnClickListener(v -> { selectedType[0] = Transaction.Type.OUTGOING; applySegments.run(); });
+        segIncome.setOnClickListener(v -> { selectedType[0] = Transaction.Type.INCOMING; applySegments.run(); });
+
+        segmentRow.addView(segExpense);
+        segmentRow.addView(segIncome);
+        layout.addView(segmentRow);
+        addDetailRowSpacer(layout);
 
         // ── Editable Merchant ──
         TextView tvMerchantLabel = new TextView(this);
         tvMerchantLabel.setText("Merchant");
-        tvMerchantLabel.setTextSize(11);
+        tvMerchantLabel.setTextSize(13);
         tvMerchantLabel.setTextColor(0xFF888888);
         tvMerchantLabel.setTypeface(null, android.graphics.Typeface.BOLD);
-        tvMerchantLabel.setPadding(0, 8, 0, 4);
         layout.addView(tvMerchantLabel);
 
         EditText etEditMerchant = new EditText(this);
         etEditMerchant.setText(t.getMerchant());
-        etEditMerchant.setTextSize(15);
+        etEditMerchant.setTextSize(17);
         etEditMerchant.setTextColor(0xFF111111);
         etEditMerchant.setBackgroundResource(R.drawable.input_outline);
-        etEditMerchant.setPadding(16, 12, 16, 12);
+        etEditMerchant.setPadding(18, 14, 18, 14);
         etEditMerchant.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         layout.addView(etEditMerchant);
+        addDetailRowSpacer(layout);
 
         // ── Editable Category ──
         TextView tvCatLabel = new TextView(this);
-        tvCatLabel.setText("Category (future emails from this merchant will use this)");
-        tvCatLabel.setTextSize(11);
+        tvCatLabel.setText("Category");
+        tvCatLabel.setTextSize(13);
         tvCatLabel.setTextColor(0xFF888888);
         tvCatLabel.setTypeface(null, android.graphics.Typeface.BOLD);
-        tvCatLabel.setPadding(0, 16, 0, 4);
         layout.addView(tvCatLabel);
+
+        if (!isGmail) {
+            TextView tvCatHint = new TextView(this);
+            tvCatHint.setText("(tags this entry only)");
+            tvCatHint.setTextSize(11);
+            tvCatHint.setTextColor(0xFFAAAAAA);
+            layout.addView(tvCatHint);
+        }
 
         String[] allCategories = {
                 "Food & Dining", "Shopping", "Subscriptions", "Transportation",
@@ -443,10 +564,10 @@ public class HomeActivity extends AppCompatActivity {
 
         TextView tvSelectedCat = new TextView(this);
         tvSelectedCat.setText(selectedCategory[0]);
-        tvSelectedCat.setTextSize(15);
+        tvSelectedCat.setTextSize(17);
         tvSelectedCat.setTextColor(0xFF111111);
         tvSelectedCat.setBackgroundResource(R.drawable.input_outline);
-        tvSelectedCat.setPadding(16, 12, 16, 12);
+        tvSelectedCat.setPadding(18, 14, 18, 14);
         tvSelectedCat.setClickable(true);
         tvSelectedCat.setFocusable(true);
         tvSelectedCat.setOnClickListener(v -> {
@@ -467,19 +588,29 @@ public class HomeActivity extends AppCompatActivity {
                     .show();
         });
         layout.addView(tvSelectedCat);
+        addDetailRowSpacer(layout);
+        addDetailRowSpacer(layout);
+
+        // ── Divider before actions ──
+        View divider2 = new View(this);
+        divider2.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 1));
+        divider2.setBackgroundColor(0xFFE0D5C0);
+        layout.addView(divider2);
+        addDetailRowSpacer(layout);
 
         // ── Save Button ──
-        Button btnSaveMapping = new Button(this);
-        btnSaveMapping.setText("Save Mapping");
-        btnSaveMapping.setTextSize(14);
-        btnSaveMapping.setTextColor(0xFFF9AC54);
-        btnSaveMapping.setBackgroundResource(R.drawable.btn_save_outline);
-        btnSaveMapping.setPadding(0, 0, 0, 0);
+        Button btnSave = new Button(this);
+        btnSave.setText("Save Changes");
+        btnSave.setTextSize(16);
+        btnSave.setTextColor(0xFFF9AC54);
+        btnSave.setBackground(null);
+        btnSave.setPadding(0, 0, 0, 0);
+        btnSave.setAllCaps(false);
         LinearLayout.LayoutParams btnLp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, 48);
+                LinearLayout.LayoutParams.WRAP_CONTENT, 52);
         btnLp.gravity = android.view.Gravity.CENTER;
-        btnLp.topMargin = 20;
-        btnSaveMapping.setLayoutParams(btnLp);
+        btnSave.setLayoutParams(btnLp);
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("Transaction Details")
@@ -487,34 +618,132 @@ public class HomeActivity extends AppCompatActivity {
                 .setPositiveButton("Close", null)
                 .create();
 
-        btnSaveMapping.setOnClickListener(v -> {
+        btnSave.setOnClickListener(v -> {
             String newMerchant = etEditMerchant.getText().toString().trim();
             String newCategory = selectedCategory[0];
+            String amountStr = etEditAmount.getText().toString().trim();
+            double newAmount;
+            try {
+                newAmount = Double.parseDouble(amountStr);
+            } catch (Exception e) {
+                Toast.makeText(HomeActivity.this, "Invalid amount", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
             if (!newMerchant.isEmpty()) {
-                VendorStore vs = new VendorStore(this);
-                vs.setCategory(newMerchant, newCategory);
-                Toast.makeText(this, "Saved: " + newMerchant + " → " + newCategory, Toast.LENGTH_SHORT).show();
+                String key = t.getRawVendor() != null ? t.getRawVendor() : t.getMerchant();
+                String msgId = t.getMessageId();
+
+                // Save category alias (vendor-wide)
+                VendorStore vs = new VendorStore(HomeActivity.this);
+                vs.setCategory(key, newCategory);
+
+                // Save merchant alias (vendor-wide)
+                if (!newMerchant.equals(t.getMerchant())) {
+                    aliasStore.setAlias(key, newMerchant);
+                }
+
+                // Save per-message overrides for Gmail transactions
+                if (msgId != null && isGmail) {
+                    TransactionOverrideStore ovStore = new TransactionOverrideStore(HomeActivity.this);
+                    if (selectedType[0] != t.getType()) {
+                        ovStore.setType(msgId, selectedType[0] == Transaction.Type.INCOMING ? "incoming" : "outgoing");
+                    }
+                    if (newAmount != t.getAmount()) {
+                        ovStore.setAmount(msgId, newAmount);
+                    }
+                }
+
+                // Update ALL existing transactions from this vendor immediately (merchant + category)
+                for (int i = 0; i < allTransactions.size(); i++) {
+                    Transaction tx = allTransactions.get(i);
+                    String txKey = tx.getRawVendor() != null ? tx.getRawVendor() : tx.getMerchant();
+                    boolean matchByKey = key.equals(txKey);
+                    boolean matchById = msgId != null && msgId.equals(tx.getMessageId());
+                    if (matchById) {
+                        // Update this specific transaction with ALL edits
+                        allTransactions.set(i, new Transaction(
+                                newMerchant, newAmount, tx.getDateMillis(),
+                                tx.getDateDisplay(), newCategory, tx.getAvatarLetter(),
+                                selectedType[0], tx.getSenderEmail(), tx.getSubject(),
+                                tx.getMessageId(), tx.getRawVendor()
+                        ));
+                    } else if (matchByKey) {
+                        // Other transactions from same vendor: merchant + category only
+                        allTransactions.set(i, new Transaction(
+                                newMerchant, tx.getAmount(), tx.getDateMillis(),
+                                tx.getDateDisplay(), newCategory, tx.getAvatarLetter(),
+                                tx.getType(), tx.getSenderEmail(), tx.getSubject(),
+                                tx.getMessageId(), tx.getRawVendor()
+                        ));
+                    }
+                }
+
+                // Persist changes for manual entries
+                if (msgId != null && msgId.startsWith("manual_")) {
+                    manualStore.delete(msgId);
+                    Transaction updated = new Transaction(
+                            newMerchant, newAmount, t.getDateMillis(),
+                            t.getDateDisplay(), newCategory, t.getAvatarLetter(),
+                            selectedType[0], null, t.getSubject(),
+                            msgId, null
+                    );
+                    manualStore.save(updated);
+                }
+
+                Toast.makeText(HomeActivity.this, "Changes saved", Toast.LENGTH_SHORT).show();
                 dialog.dismiss();
-                fetchAndShowTransactions();
+                filterAndRender();
             } else {
-                Toast.makeText(this, "Merchant name cannot be empty", Toast.LENGTH_SHORT).show();
+                Toast.makeText(HomeActivity.this, "Merchant name cannot be empty", Toast.LENGTH_SHORT).show();
             }
         });
 
-        layout.addView(btnSaveMapping);
+        layout.addView(btnSave);
+        addDetailRowSpacer(layout);
 
-        // ── Exclude Button (only for Gmail transactions) ──
-        if (t.getMessageId() != null) {
+        // ── Delete / Exclude button ──
+        if (t.getMessageId() != null && t.getMessageId().startsWith("manual_")) {
+            // Manual transaction: show Delete button
+            Button btnDelete = new Button(this);
+            btnDelete.setText("Delete this entry");
+            btnDelete.setTextSize(15);
+            btnDelete.setTextColor(0xFFE53935);
+            btnDelete.setBackground(null);
+            btnDelete.setPadding(0, 0, 0, 0);
+            btnDelete.setAllCaps(false);
+            LinearLayout.LayoutParams delLp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 52);
+            delLp.gravity = android.view.Gravity.CENTER;
+            btnDelete.setLayoutParams(delLp);
+
+            btnDelete.setOnClickListener(v ->
+                    new AlertDialog.Builder(this)
+                            .setTitle("Delete this entry?")
+                            .setMessage("This manual transaction will be permanently removed.")
+                            .setPositiveButton("Delete", (dialog2, which2) -> {
+                                manualStore.delete(t.getMessageId());
+                                Toast.makeText(this, "Transaction deleted", Toast.LENGTH_SHORT).show();
+                                dialog.dismiss();
+                                fetchAndShowTransactions();
+                            })
+                            .setNegativeButton("Cancel", null)
+                            .show()
+            );
+
+            layout.addView(btnDelete);
+        } else if (isGmail) {
+            // Gmail transaction: show Exclude button
             Button btnExclude = new Button(this);
             btnExclude.setText("Exclude this email forever");
-            btnExclude.setTextSize(13);
+            btnExclude.setTextSize(15);
             btnExclude.setTextColor(0xFFE53935);
-            btnExclude.setBackgroundResource(R.drawable.btn_save_outline);
+            btnExclude.setBackground(null);
             btnExclude.setPadding(0, 0, 0, 0);
+            btnExclude.setAllCaps(false);
             LinearLayout.LayoutParams exclLp = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT, 48);
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 52);
             exclLp.gravity = android.view.Gravity.CENTER;
-            exclLp.topMargin = 12;
             btnExclude.setLayoutParams(exclLp);
 
             btnExclude.setOnClickListener(v ->
@@ -548,15 +777,21 @@ public class HomeActivity extends AppCompatActivity {
         tvLabel.setTextSize(11);
         tvLabel.setTextColor(0xFF888888);
         tvLabel.setTypeface(null, android.graphics.Typeface.BOLD);
-        tvLabel.setPadding(0, 8, 0, 2);
 
         TextView tvValue = new TextView(this);
         tvValue.setText(value);
-        tvValue.setTextSize(15);
+        tvValue.setTextSize(14);
         tvValue.setTextColor(0xFF111111);
 
         parent.addView(tvLabel);
         parent.addView(tvValue);
+    }
+
+    private void addDetailRowSpacer(LinearLayout parent) {
+        View spacer = new View(this);
+        spacer.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 10));
+        parent.addView(spacer);
     }
 
     // ── FILTERING ──

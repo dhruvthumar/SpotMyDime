@@ -21,7 +21,7 @@ public class GeminiClassifier {
     public static String apiKey = "";
 
     public static String classify(String sender, String subject, String snippet) {
-        ClassificationResult r = classifyFull(sender, subject, snippet);
+        ClassificationResult r = classifyFull(sender, subject, snippet, null);
         return r == null ? null : r.category;
     }
 
@@ -30,34 +30,29 @@ public class GeminiClassifier {
      * Returns a ClassificationResult containing category, vendor and amount when
      * available. Returns null on unexpected failures.
      */
-    public static ClassificationResult classifyFull(String sender, String subject, String snippet) {
+    public static ClassificationResult classifyFull(String sender, String subject, String snippet, String fullBody) {
         // If no API key is configured, do not call remote model (user requested no hardcoded rules).
         if (apiKey == null || apiKey.isEmpty()) {
             Log.w(TAG, "No API key configured for Gemini — remote classification disabled");
             return null;
         }
-        // Primary flow: send the subject (and optional snippet) to the remote
-        // model and instruct it to reply with a compact JSON object containing
-        // category, vendor and amount. Example reply:
-        // {"category":"Shopping","vendor":"Amazon","amount":"59.23"}
-        // The model is asked to reply with JSON only (no extra text).
-        if (apiKey == null || apiKey.isEmpty()) {
-            Log.w(TAG, "No API key configured for Gemini — remote classification disabled");
-            return null;
-        }
+
+        // Truncate fullBody to avoid excessive token usage (first 1500 chars)
+        String body = fullBody != null ? fullBody.substring(0, Math.min(fullBody.length(), 1500)) : "";
 
         String prompt = "You are a transaction classifier.\n"
                 + "Input fields:\n"
                 + "  subject: the email subject line\n"
-                + "  snippet: optional short preview of the email body\n"
+                + "  body: the full email body content\n"
                 + "Instructions:\n"
                 + "  1) If the email is a transactional/receipt/payment notification, output a JSON object EXACTLY in this format (only JSON, no extra commentary):\n"
                 + "     {\"category\":\"<one of: Food & Dining, Shopping, Subscriptions, Transportation, Bills & Utilities, Entertainment, Health, Interac Sent, Interac Received, Other>\",\"vendor\":\"<vendor name or empty>\",\"amount\":\"<numeric amount like 59.23 or empty>\",\"type\":\"<incoming or outgoing>\"}\n"
                 + "  2) If the email is NOT transactional, set category to \"Other\", vendor/amount to empty strings, and type to \"outgoing\".\n"
                 + "  3) type must be \"outgoing\" when money leaves the user's account (purchases, bills, payments), or \"incoming\" when money comes in (refunds, deposits, cashback, reimbursements).\n"
+                + "  4) Only classify an email as a transaction if it contains a specific dollar amount and merchant name. Ignore informational/digest emails.\n"
                 + "Now classify the following email:\n"
                 + "subject: \"" + (subject != null ? subject.replace("\"", "\\\"") : "") + "\"\n"
-                + "snippet: \"" + (snippet != null ? snippet.replace("\"", "\\\"") : "") + "\"\n";
+                + "body: \"" + body.replace("\"", "\\\"") + "\"\n";
 
         try {
             Log.d(TAG, "Calling Gemini for subject: " + subject);

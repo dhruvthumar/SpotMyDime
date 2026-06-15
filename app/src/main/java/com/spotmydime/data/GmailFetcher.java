@@ -106,6 +106,8 @@ public class GmailFetcher {
                 List<Transaction> results = new ArrayList<>();
                 int max = Math.min(messages.length(), 200);
                 VendorStore vendorStore = new VendorStore(context);
+                VendorAliasStore aliasStore = new VendorAliasStore(context);
+                TransactionOverrideStore overrideStore = new TransactionOverrideStore(context);
                 ExcludedMessageStore excludedStore = new ExcludedMessageStore(context);
 
                 for (int i = 0; i < max; i++) {
@@ -119,7 +121,7 @@ public class GmailFetcher {
                     String msgJson = executeGet(
                             GMAIL_API + "/messages/" + msgId + "?format=full", token);
 
-                    Transaction t = parseMessage(msgJson, vendorStore, msgId);
+                    Transaction t = parseMessage(msgJson, vendorStore, aliasStore, overrideStore, msgId);
                     if (t != null) {
                         results.add(t);
                         Log.d(TAG, "Parsed: " + t.getMerchant() + " $" + t.getAmount() + " [" + t.getCategory() + "]");
@@ -167,7 +169,10 @@ public class GmailFetcher {
         return sb.toString();
     }
 
-    private static Transaction parseMessage(String msgJson, VendorStore vendorStore, String messageId) throws Exception {
+    private static Transaction parseMessage(String msgJson, VendorStore vendorStore,
+                                              VendorAliasStore aliasStore,
+                                              TransactionOverrideStore overrideStore,
+                                              String messageId) throws Exception {
         JSONObject obj = new JSONObject(msgJson);
         JSONObject payload = obj.getJSONObject("payload");
 
@@ -204,6 +209,12 @@ public class GmailFetcher {
         String dateDisplay = sdf.format(new Date(internalDate));
 
         String vendor = extractVendorName(from);
+        String rawVendor = vendor;
+        // Apply custom display name alias if user has renamed this vendor
+        if (vendor != null && aliasStore != null) {
+            String alias = aliasStore.getAlias(vendor);
+            if (alias != null) vendor = alias;
+        }
         String merchant = (vendor != null && !vendor.isEmpty()) ? vendor : subject;
 
         // Extract the full body early so the classifier can inspect it when
@@ -230,7 +241,7 @@ public class GmailFetcher {
 
             Log.d(TAG, "Interac: " + cat + " | $" + amount + " | " + txnType);
             return new Transaction(merchant, amount, internalDate, dateDisplay, cat, avatar, txnType,
-                    extractEmailFromHeader(from), subject, messageId);
+                    extractEmailFromHeader(from), subject, messageId, rawVendor);
         }
 
         // Determine if this looks like a transactional email first. If not, skip
@@ -252,7 +263,7 @@ public class GmailFetcher {
                 category = guessCategoryFallback(vendor, subject);
             } else {
                 // Call the AI classifier and accept its structured output
-                res = GeminiClassifier.classifyFull(vendor, subject, snippet);
+                res = GeminiClassifier.classifyFull(vendor, subject, snippet, fullBody);
                 if (res != null) {
                     category = res.category == null ? "Other" : res.category;
                     // If the model extracted a vendor, prefer it (useful when subject
@@ -292,11 +303,24 @@ public class GmailFetcher {
                     ? Transaction.Type.INCOMING : Transaction.Type.OUTGOING;
         }
 
+        // Apply user overrides if this message has been edited before
+        if (messageId != null && overrideStore != null) {
+            String overrideType = overrideStore.getType(messageId);
+            if (overrideType != null) {
+                type = "incoming".equalsIgnoreCase(overrideType)
+                        ? Transaction.Type.INCOMING : Transaction.Type.OUTGOING;
+            }
+            Double overrideAmount = overrideStore.getAmount(messageId);
+            if (overrideAmount != null) {
+                amount = overrideAmount;
+            }
+        }
+
         Log.d(TAG, "From: " + from + " | Vendor: " + vendor + " | Category: " + category
                 + " | $" + amount + " | " + type);
 
         return new Transaction(merchant, amount, internalDate, dateDisplay, category, avatar, type,
-                extractEmailFromHeader(from), subject, messageId);
+                extractEmailFromHeader(from), subject, messageId, rawVendor);
     }
 
     private static String guessCategoryFallback(String vendor, String subject) {

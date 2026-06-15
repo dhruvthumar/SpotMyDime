@@ -9,11 +9,13 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
+import java.util.UUID;
 
 public class ManualTransactionStore {
 
     private static final String PREFS_NAME = "manual_transactions";
     private static final String KEY_LIST = "list";
+    private static final String MANUAL_PREFIX = "manual_";
 
     private final SharedPreferences prefs;
 
@@ -34,6 +36,7 @@ public class ManualTransactionStore {
             JSONArray arr = new JSONArray(json);
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject o = arr.getJSONObject(i);
+                String id = o.optString("id", MANUAL_PREFIX + UUID.randomUUID());
                 list.add(new Transaction(
                         o.optString("merchant", ""),
                         o.optDouble("amount", 0),
@@ -44,13 +47,22 @@ public class ManualTransactionStore {
                         "incoming".equals(o.optString("type"))
                                 ? Transaction.Type.INCOMING : Transaction.Type.OUTGOING,
                         null,
-                        o.optString("notes", "")
+                        o.optString("notes", ""),
+                        id,
+                        null
                 ));
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
         return list;
+    }
+
+    public void delete(String id) {
+        if (id == null) return;
+        List<Transaction> all = getAll();
+        all.removeIf(t -> id.equals(t.getMessageId()));
+        saveAll(all);
     }
 
     private void saveAll(List<Transaction> list) {
@@ -65,6 +77,7 @@ public class ManualTransactionStore {
                 o.put("category", t.getCategory());
                 o.put("type", t.getType() == Transaction.Type.INCOMING ? "incoming" : "outgoing");
                 o.put("notes", t.getSubject() != null ? t.getSubject() : "");
+                o.put("id", t.getMessageId() != null ? t.getMessageId() : MANUAL_PREFIX + UUID.randomUUID());
                 arr.put(o);
             }
             prefs.edit().putString(KEY_LIST, arr.toString()).apply();
@@ -79,7 +92,8 @@ public class ManualTransactionStore {
                                                   String notes) {
         char avatar = merchant.isEmpty() ? '?' : merchant.charAt(0);
         if (avatar >= 'a' && avatar <= 'z') avatar = (char) (avatar - 32);
+        String id = MANUAL_PREFIX + UUID.randomUUID().toString();
         return new Transaction(merchant, amount, dateMillis, dateDisplay, category, avatar, type,
-                null, notes);
+                null, notes, id, null);
     }
 }
