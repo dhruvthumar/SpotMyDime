@@ -590,6 +590,72 @@
 
             </LinearLayout>
 
+            <!-- ════════════════════════════════════════════════════ -->
+            <!-- TAB 4 – INSIGHTS CONTENT                            -->
+            <!-- ════════════════════════════════════════════════════ -->
+            <LinearLayout
+                    android:id="@+id/container_insights"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    android:paddingTop="16dp"
+                    android:paddingBottom="24dp">
+
+                <!-- ── HEADER ── -->
+                <RelativeLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingHorizontal="20dp"
+                        android:paddingVertical="12dp">
+
+                    <TextView
+                            android:id="@+id/tv_insights_title"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Insights"
+                            android:textColor="#111111"
+                            android:textSize="24sp"
+                            android:textStyle="bold"
+                            android:layout_centerVertical="true" />
+
+                </RelativeLayout>
+
+                <!-- ── Divider ── -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#E0D5C0"
+                    android:layout_marginHorizontal="20dp" />
+
+                <!-- ── SUB-NAVIGATION ROW (All Accounts, Spending, Income, Trends) ── -->
+                <HorizontalScrollView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:scrollbars="none"
+                        android:paddingHorizontal="16dp">
+
+                    <LinearLayout
+                            android:id="@+id/insights_sub_nav"
+                            android:layout_width="wrap_content"
+                            android:layout_height="48dp"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical" />
+
+                </HorizontalScrollView>
+
+                <!-- ── SUB-TAB CONTENT CONTAINER ── -->
+                <LinearLayout
+                        android:id="@+id/container_insights_content"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:layout_marginTop="20dp"
+                        android:paddingHorizontal="16dp" />
+
+            </LinearLayout>
+
         </LinearLayout>
 
     </androidx.core.widget.NestedScrollView>
@@ -671,9 +737,9 @@
                     android:contentDescription="Tab 3" />
         </LinearLayout>
 
-        <!-- Tab 4 -->
+        <!-- Tab 4 – Insights -->
         <LinearLayout
-                android:id="@+id/nav_gallery"
+                android:id="@+id/nav_insights"
                 android:layout_width="0dp"
                 android:layout_height="60dp"
                 android:layout_weight="1"
@@ -684,11 +750,12 @@
                 android:foreground="?attr/selectableItemBackground">
 
             <ImageView
-                    android:id="@+id/ic_nav_gallery"
+                    android:id="@+id/ic_nav_insights"
                     android:layout_width="30dp"
                     android:layout_height="30dp"
                     android:src="@drawable/tab_4"
                     android:contentDescription="Tab 4" />
+
         </LinearLayout>
 
         <!-- Tab 5 -->
