@@ -106,13 +106,20 @@ public class GmailFetcher {
                 List<Transaction> results = new ArrayList<>();
                 int max = Math.min(messages.length(), 200);
                 VendorStore vendorStore = new VendorStore(context);
+                ExcludedMessageStore excludedStore = new ExcludedMessageStore(context);
 
                 for (int i = 0; i < max; i++) {
                     String msgId = messages.getJSONObject(i).getString("id");
+
+                    if (excludedStore.isExcluded(msgId)) {
+                        Log.d(TAG, "Skipping excluded message: " + msgId);
+                        continue;
+                    }
+
                     String msgJson = executeGet(
                             GMAIL_API + "/messages/" + msgId + "?format=full", token);
 
-                    Transaction t = parseMessage(msgJson, vendorStore);
+                    Transaction t = parseMessage(msgJson, vendorStore, msgId);
                     if (t != null) {
                         results.add(t);
                         Log.d(TAG, "Parsed: " + t.getMerchant() + " $" + t.getAmount() + " [" + t.getCategory() + "]");
@@ -160,7 +167,7 @@ public class GmailFetcher {
         return sb.toString();
     }
 
-    private static Transaction parseMessage(String msgJson, VendorStore vendorStore) throws Exception {
+    private static Transaction parseMessage(String msgJson, VendorStore vendorStore, String messageId) throws Exception {
         JSONObject obj = new JSONObject(msgJson);
         JSONObject payload = obj.getJSONObject("payload");
 
@@ -223,7 +230,7 @@ public class GmailFetcher {
 
             Log.d(TAG, "Interac: " + cat + " | $" + amount + " | " + txnType);
             return new Transaction(merchant, amount, internalDate, dateDisplay, cat, avatar, txnType,
-                    extractEmailFromHeader(from), subject);
+                    extractEmailFromHeader(from), subject, messageId);
         }
 
         // Determine if this looks like a transactional email first. If not, skip
@@ -289,7 +296,7 @@ public class GmailFetcher {
                 + " | $" + amount + " | " + type);
 
         return new Transaction(merchant, amount, internalDate, dateDisplay, category, avatar, type,
-                extractEmailFromHeader(from), subject);
+                extractEmailFromHeader(from), subject, messageId);
     }
 
     private static String guessCategoryFallback(String vendor, String subject) {

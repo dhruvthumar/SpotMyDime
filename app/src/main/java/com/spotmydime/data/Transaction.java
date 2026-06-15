@@ -13,15 +13,22 @@ public class Transaction {
     private final Type type;
     private final String senderEmail;
     private final String subject;
+    private final String messageId;
 
     public Transaction(String merchant, double amount, long dateMillis,
                        String dateDisplay, String category, char avatarLetter, Type type) {
-        this(merchant, amount, dateMillis, dateDisplay, category, avatarLetter, type, null, null);
+        this(merchant, amount, dateMillis, dateDisplay, category, avatarLetter, type, null, null, null);
     }
 
     public Transaction(String merchant, double amount, long dateMillis,
                        String dateDisplay, String category, char avatarLetter, Type type,
                        String senderEmail, String subject) {
+        this(merchant, amount, dateMillis, dateDisplay, category, avatarLetter, type, senderEmail, subject, null);
+    }
+
+    public Transaction(String merchant, double amount, long dateMillis,
+                       String dateDisplay, String category, char avatarLetter, Type type,
+                       String senderEmail, String subject, String messageId) {
         this.merchant = merchant;
         this.amount = amount;
         this.dateMillis = dateMillis;
@@ -31,6 +38,7 @@ public class Transaction {
         this.type = type;
         this.senderEmail = senderEmail;
         this.subject = subject;
+        this.messageId = messageId;
     }
 
     public String getMerchant() { return merchant; }
@@ -42,4 +50,5 @@ public class Transaction {
     public Type getType() { return type; }
     public String getSenderEmail() { return senderEmail; }
     public String getSubject() { return subject; }
+    public String getMessageId() { return messageId; }
 }

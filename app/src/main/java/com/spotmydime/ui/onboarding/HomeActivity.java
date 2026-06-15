@@ -11,6 +11,8 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Button;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
@@ -23,6 +25,7 @@ import com.spotmydime.data.ManualTransactionStore;
 import com.spotmydime.data.Transaction;
 import com.spotmydime.data.TransactionParser;
 import com.spotmydime.data.VendorStore;
+import com.spotmydime.data.ExcludedMessageStore;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -52,6 +55,10 @@ public class HomeActivity extends AppCompatActivity {
     private Long startDateMillis = null;
     private Long endDateMillis = null;
     private boolean needsAuthRetry = false;
+    private String searchQuery = "";
+
+    private EditText etSearch;
+    private ExcludedMessageStore excludedStore;
 
     // Manual entry
     private LinearLayout containerAdd;
@@ -109,6 +116,18 @@ public class HomeActivity extends AppCompatActivity {
         findViewById(R.id.btn_filter_date).setOnClickListener(v -> showDateRangePicker());
         findViewById(R.id.btn_filter_all).setOnClickListener(v -> clearFilters());
         btnClear.setOnClickListener(v -> clearFilters());
+
+        etSearch = findViewById(R.id.et_search);
+        etSearch.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override public void afterTextChanged(Editable s) {
+                searchQuery = s.toString().trim().toLowerCase();
+                filterAndRender();
+            }
+        });
+
+        excludedStore = new ExcludedMessageStore(this);
 
         manualStore = new ManualTransactionStore(this);
 
@@ -484,6 +503,37 @@ public class HomeActivity extends AppCompatActivity {
 
         layout.addView(btnSaveMapping);
 
+        // ── Exclude Button (only for Gmail transactions) ──
+        if (t.getMessageId() != null) {
+            Button btnExclude = new Button(this);
+            btnExclude.setText("Exclude this email forever");
+            btnExclude.setTextSize(13);
+            btnExclude.setTextColor(0xFFE53935);
+            btnExclude.setBackgroundResource(R.drawable.btn_save_outline);
+            btnExclude.setPadding(0, 0, 0, 0);
+            LinearLayout.LayoutParams exclLp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 48);
+            exclLp.gravity = android.view.Gravity.CENTER;
+            exclLp.topMargin = 12;
+            btnExclude.setLayoutParams(exclLp);
+
+            btnExclude.setOnClickListener(v ->
+                    new AlertDialog.Builder(this)
+                            .setTitle("Exclude this email?")
+                            .setMessage("This transaction will be removed and this email will never be synced again.")
+                            .setPositiveButton("Exclude", (dialog2, which2) -> {
+                                excludedStore.exclude(t.getMessageId());
+                                Toast.makeText(this, "Email excluded forever", Toast.LENGTH_SHORT).show();
+                                dialog.dismiss();
+                                fetchAndShowTransactions();
+                            })
+                            .setNegativeButton("Cancel", null)
+                            .show()
+            );
+
+            layout.addView(btnExclude);
+        }
+
         dialog.show();
         if (dialog.getWindow() != null) {
             dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(bgColor));
@@ -587,6 +637,8 @@ public class HomeActivity extends AppCompatActivity {
         startDateMillis = null;
         endDateMillis = null;
         tvDateRangeFilter.setVisibility(View.GONE);
+        searchQuery = "";
+        etSearch.setText("");
         Toast.makeText(this, "Filters cleared", Toast.LENGTH_SHORT).show();
         if (allTransactions != null) {
             populateDashboard(allTransactions);
@@ -597,6 +649,18 @@ public class HomeActivity extends AppCompatActivity {
         if (allTransactions == null) return;
 
         List<Transaction> filtered = allTransactions;
+
+        if (!searchQuery.isEmpty()) {
+            filtered = filtered.stream()
+                    .filter(t ->
+                            (t.getMerchant() != null && t.getMerchant().toLowerCase().contains(searchQuery)) ||
+                            (t.getCategory() != null && t.getCategory().toLowerCase().contains(searchQuery)) ||
+                            (t.getSenderEmail() != null && t.getSenderEmail().toLowerCase().contains(searchQuery)) ||
+                            (t.getSubject() != null && t.getSubject().toLowerCase().contains(searchQuery)) ||
+                            TransactionParser.formatAmount(t.getAmount()).toLowerCase().contains(searchQuery)
+                    )
+                    .collect(Collectors.toList());
+        }
 
         if (selectedCategory != null) {
             filtered = filtered.stream()
