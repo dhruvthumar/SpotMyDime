@@ -1,0 +1,42 @@
+{
+  "project_info": {
+    "project_number": "998068474923",
+    "project_id": "spotmydime",
+    "storage_bucket": "spotmydime.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:998068474923:android:668ed116ef7efaaf74466e",
+        "android_client_info": {
+          "package_name": "com.spotmydime"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "198990451158-e536bsrps9ald9ncknea25bjlhlufkt8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.spotmydime",
+            "certificate_hash": "727da32cd09b4daeff98372334f3ee9c1a9033a8"
+          }
+        },
+        {
+          "client_id": "198990451158-0uvpotk9se3o5s1qq66n1pcf360e62rp.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBdDypxM7AZv7UKBFI4Q7YUP9d6Pogaitk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

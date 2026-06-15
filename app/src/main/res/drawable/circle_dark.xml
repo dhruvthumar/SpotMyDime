@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- app/src/main/res/drawable/circle_dark.xml -->
+<!-- Dark circle for transaction merchant initials -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+       android:shape="oval">
+    <solid android:color="#111111" />
+</shape>
