@@ -23,12 +23,20 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class GmailFetcher {
 
     private static final String TAG = "GmailFetcher";
     private static final String GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
     private static final String SCOPE = "oauth2:https://www.googleapis.com/auth/gmail.readonly";
+
+    // Matches dollar amounts like $12.34, $1,234.56, or amounts near money keywords
+    private static final Pattern SNIPPET_AMOUNT =
+            Pattern.compile("\\$\\s*[0-9]+(?:[,.][0-9]+)*|" +
+                    "(?:total|amount|paid|charged|due|cost|price|spent|payment|sale|balance|fee|subtotal|grand total|sum)\\s*[:\\s]*\\$?\\s*[0-9]+(?:[,.][0-9]+)*",
+                    Pattern.CASE_INSENSITIVE);
 
     public interface Callback {
         void onResult(List<Transaction> transactions);
@@ -61,7 +69,10 @@ public class GmailFetcher {
                 String dateStr = new SimpleDateFormat("yyyy/MM/dd", Locale.US)
                         .format(new Date(oneMonthAgo));
 
-                String query = "after:" + dateStr;
+                // Gmail search query: only get emails that contain monetary signals
+                String query = "after:" + dateStr
+                        + " ($ OR total OR amount OR paid OR charged OR receipt OR invoice"
+                        + " OR \"order confirmation\" OR \"your order\" OR \"payment received\")";
 
                 String listUrl = GMAIL_API + "/messages?q="
                         + java.net.URLEncoder.encode(query, "UTF-8") + "&maxResults=30";
@@ -158,6 +169,16 @@ public class GmailFetcher {
         long internalDate = obj.optLong("internalDate", System.currentTimeMillis());
 
         String snippet = obj.optString("snippet", "");
+
+        // Quick pre-filter: skip if neither snippet nor subject contains a
+        // money-amount pattern. This avoids fetching the full body + running
+        // the classifier on clearly non-transactional messages.
+        String preCheck = snippet + " " + subject;
+        Matcher preMatch = SNIPPET_AMOUNT.matcher(preCheck);
+        if (!preMatch.find()) {
+            Log.d(TAG, "Skipping — no money pattern in snippet: " + subject);
+            return null;
+        }
 
         SimpleDateFormat sdf = new SimpleDateFormat("MMM dd", Locale.US);
         String dateDisplay = sdf.format(new Date(internalDate));
