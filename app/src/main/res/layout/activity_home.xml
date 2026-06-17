@@ -1164,6 +1164,20 @@
 
             </LinearLayout>
 
+            <!-- ════════════════════════════════════════════════════ -->
+            <!-- TAB 5 – SETTINGS                                    -->
+            <!-- ════════════════════════════════════════════════════ -->
+            <LinearLayout
+                    android:id="@+id/container_settings"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    android:paddingBottom="24dp">
+
+                <include layout="@layout/activity_settings" />
+            </LinearLayout>
+
         </LinearLayout>
 
     </androidx.core.widget.NestedScrollView>
