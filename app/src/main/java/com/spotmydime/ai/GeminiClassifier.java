@@ -11,6 +11,16 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
+/**
+ * Calls the Gemini API to classify a transaction email.
+ *
+ * Input:  sender display name, subject line, snippet, full body
+ * Output: ClassificationResult with category, merchant nickname,
+ *         amount, transaction type (incoming/outgoing), and optional date.
+ *
+ * Vendor memory lives in VendorStore (GmailFetcher layer) — this class
+ * is stateless and only makes the API call + parses the response.
+ */
 public class GeminiClassifier {
 
     private static final String TAG = "GeminiClassifier";
@@ -18,59 +28,48 @@ public class GeminiClassifier {
     private static final String API_URL =
             "https://generativelanguage.googleapis.com/v1beta/models/" + MODEL + ":generateContent?key=";
 
+    /** Set from HomeActivity.onCreate via BuildConfig or strings.xml. */
     public static String apiKey = "";
 
+    // ── Public API ────────────────────────────────────────────────────────────
+
+    /** Convenience: returns only category string. */
     public static String classify(String sender, String subject, String snippet) {
         ClassificationResult r = classifyFull(sender, subject, snippet, null);
         return r == null ? null : r.category;
     }
 
     /**
-     * Classifies the email using the remote model (when API key configured).
-     * Returns a ClassificationResult containing category, vendor and amount when
-     * available. Returns null on unexpected failures.
+     * Full classification. Uses subject line as primary signal; body provides
+     * amount and date confirmation. Returns null on network/parse failure —
+     * caller should fall back to local heuristics.
      */
-    public static ClassificationResult classifyFull(String sender, String subject, String snippet, String fullBody) {
-        // If no API key is configured, do not call remote model (user requested no hardcoded rules).
+    public static ClassificationResult classifyFull(String sender, String subject,
+                                                     String snippet, String fullBody) {
         if (apiKey == null || apiKey.isEmpty()) {
-            Log.w(TAG, "No API key configured for Gemini — remote classification disabled");
+            Log.w(TAG, "No API key — Gemini disabled");
             return null;
         }
 
-        // Truncate fullBody to avoid excessive token usage (first 1500 chars)
-        String body = fullBody != null ? fullBody.substring(0, Math.min(fullBody.length(), 1500)) : "";
+        // Truncate body to keep token cost low (~750 words)
+        String body = fullBody != null
+                ? fullBody.substring(0, Math.min(fullBody.length(), 2000))
+                : "";
 
-        String prompt = "You are a transaction classifier.\n"
-                + "Input fields:\n"
-                + "  subject: the email subject line\n"
-                + "  body: the full email body content\n"
-                + "Instructions:\n"
-                + "  1) If the email is a transactional/receipt/payment notification, output a JSON object EXACTLY in this format (only JSON, no extra commentary):\n"
-                + "     {\"category\":\"<one of: Food & Dining, Shopping, Subscriptions, Transportation, Bills & Utilities, Entertainment, Health, Interac Sent, Interac Received, Other>\",\"vendor\":\"<vendor name or empty>\",\"amount\":\"<numeric amount like 59.23 or empty>\",\"type\":\"<incoming or outgoing>\"}\n"
-                + "  2) If the email is NOT transactional, set category to \"Other\", vendor/amount to empty strings, and type to \"outgoing\".\n"
-                + "  3) type must be \"outgoing\" when money leaves the user's account (purchases, bills, payments), or \"incoming\" when money comes in (refunds, deposits, cashback, reimbursements).\n"
-                + "  4) CRITICAL: Emails about credit card payments, loan payments, or mortgage payments (e.g. \"payment received for your credit card\", \"credit card payment confirmation\") are OUTGOING — the user is sending money to pay their bill. Do NOT classify these as incoming.\n"
-                + "  5) Emails about refunds, cashback, deposits, or money being sent TO the user are INCOMING.\n"
-                + "  6) Only classify an email as a transaction if it contains a specific dollar amount and merchant name. Ignore informational/digest emails.\n"
-                + "Now classify the following email:\n"
-                + "subject: \"" + (subject != null ? subject.replace("\"", "\\\"") : "") + "\"\n"
-                + "body: \"" + body.replace("\"", "\\\"") + "\"\n";
+        String prompt = buildPrompt(sender, subject, snippet, body);
 
         try {
-            Log.d(TAG, "Calling Gemini for subject: " + subject);
-
+            Log.d(TAG, "Gemini call — subject: " + subject);
             String requestJson = buildRequest(prompt);
-            String urlStr = API_URL + apiKey;
-            String responseJson = postJson(urlStr, requestJson);
+            String responseJson = postJson(API_URL + apiKey, requestJson);
 
             if (responseJson == null) {
-                Log.w(TAG, "Gemini returned null response");
+                Log.w(TAG, "Gemini null response");
                 return null;
             }
 
-            Log.d(TAG, "Gemini raw response: " + responseJson);
-
-            return parseResponseToResult(responseJson);
+            Log.d(TAG, "Gemini response: " + responseJson);
+            return parseResponse(responseJson);
 
         } catch (Exception e) {
             Log.e(TAG, "Gemini call failed", e);
@@ -78,38 +77,55 @@ public class GeminiClassifier {
         }
     }
 
-    // Local fallback classifier: simple keyword matching across sender, subject, snippet.
-    private static String localClassify(String sender, String subject, String snippet) {
-        StringBuilder sb = new StringBuilder();
-        if (sender != null) sb.append(sender).append(' ');
-        if (subject != null) sb.append(subject).append(' ');
-        if (snippet != null) sb.append(snippet);
-        String text = sb.toString().toLowerCase();
+    // ── Prompt ────────────────────────────────────────────────────────────────
 
-        String[][] checks = {
-            {"food & dining", "Food & Dining"}, {"food", "Food & Dining"}, {"dining", "Food & Dining"},
-            {"ubereats", "Food & Dining"}, {"doordash", "Food & Dining"},
-            {"shopping", "Shopping"}, {"amazon", "Shopping"},
-            {"subscriptions", "Subscriptions"}, {"subscription", "Subscriptions"},
-            {"uber", "Transportation"}, {"lyft", "Transportation"}, {"transport", "Transportation"},
-            {"bill", "Bills & Utilities"}, {"utilities", "Bills & Utilities"}, {"bills", "Bills & Utilities"},
-            {"netflix", "Entertainment"}, {"spotify", "Entertainment"}, {"entertain", "Entertainment"},
-            {"health", "Health"}, {"doctor", "Health"},
-            {"interac e-transfer", "Other"},
-        };
-
-        for (String[] c : checks) {
-            if (text.contains(c[0])) return c[1];
-        }
-
-        return "Other";
+    private static String buildPrompt(String sender, String subject,
+                                       String snippet, String body) {
+        return "You are a financial transaction email classifier for a personal finance app.\n"
+             + "Your job: read the email fields below and return a JSON object.\n\n"
+             + "EMAIL FIELDS:\n"
+             + "  sender:  \"" + safe(sender)  + "\"\n"
+             + "  subject: \"" + safe(subject) + "\"\n"
+             + "  snippet: \"" + safe(snippet) + "\"\n"
+             + "  body:    \"" + safe(body)    + "\"\n\n"
+             + "OUTPUT FORMAT — respond with ONLY this JSON, no markdown, no commentary:\n"
+             + "{\n"
+             + "  \"is_transaction\": true or false,\n"
+             + "  \"category\": \"<one of the categories below>\",\n"
+             + "  \"merchant\": \"<short friendly merchant name, e.g. 'Netflix', 'Tim Hortons', 'Amazon'>\",\n"
+             + "  \"amount\": \"<numeric only, e.g. 12.99, or empty string if unknown>\",\n"
+             + "  \"type\": \"<'incoming' or 'outgoing'>\",\n"
+             + "  \"date\": \"<date found in email as YYYY-MM-DD, or empty string if none>\"\n"
+             + "}\n\n"
+             + "CATEGORIES (pick exactly one):\n"
+             + "  Food & Dining, Shopping, Subscriptions, Transportation,\n"
+             + "  Bills & Utilities, Entertainment, Health, Travel,\n"
+             + "  Transfers, Interac Sent, Interac Received, Other\n\n"
+             + "RULES:\n"
+             + "1. is_transaction = true only if the email confirms a specific payment, purchase,\n"
+             + "   charge, refund, receipt, or money transfer with a dollar amount.\n"
+             + "   Promotional emails, account summaries, and newsletters = false.\n"
+             + "2. type = 'outgoing' when money LEAVES the user (purchases, bills, payments, fees).\n"
+             + "   type = 'incoming' when money COMES TO the user (refunds, deposits, cashback,\n"
+             + "   Interac received, salary, reimbursements).\n"
+             + "3. Credit card payment confirmation → outgoing (user paying their card bill).\n"
+             + "4. merchant = the business name the user would recognise, NOT the email sender name.\n"
+             + "   E.g. sender 'Uber Receipts <uber.com>' → merchant 'Uber'.\n"
+             + "5. If is_transaction = false, still return all fields but set category = 'Other',\n"
+             + "   amount = '', type = 'outgoing'.\n"
+             + "6. amount must be the transaction total only (no currency symbols, no commas).\n";
     }
 
-    private static String buildRequest(String text) throws Exception {
-        // Keep the same minimal request shape used before but ensure the
-        // prompt text is included as the single part.
+    private static String safe(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ").replace("\r", "");
+    }
+
+    // ── Request / Response ────────────────────────────────────────────────────
+
+    private static String buildRequest(String promptText) throws Exception {
         JSONObject part = new JSONObject();
-        part.put("text", text);
+        part.put("text", promptText);
 
         JSONArray parts = new JSONArray();
         parts.put(part);
@@ -120,19 +136,24 @@ public class GeminiClassifier {
         JSONArray contents = new JSONArray();
         contents.put(content);
 
+        // Ask Gemini for deterministic, structured output
+        JSONObject genConfig = new JSONObject();
+        genConfig.put("temperature", 0.1);
+        genConfig.put("topP", 0.9);
+
         JSONObject body = new JSONObject();
         body.put("contents", contents);
+        body.put("generationConfig", genConfig);
 
-        // Optionally include safetySettings or model parameters here in future
         return body.toString();
     }
 
     private static String postJson(String urlStr, String json) throws Exception {
         HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
         conn.setRequestMethod("POST");
-        conn.setRequestProperty("Content-Type", "application/json");
-        conn.setConnectTimeout(15000);
-        conn.setReadTimeout(15000);
+        conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+        conn.setConnectTimeout(20000);
+        conn.setReadTimeout(20000);
         conn.setDoOutput(true);
 
         try (OutputStream os = conn.getOutputStream()) {
@@ -140,35 +161,29 @@ public class GeminiClassifier {
         }
 
         int code = conn.getResponseCode();
-        Log.d(TAG, "HTTP " + code + " for " + urlStr.replace(apiKey, "REDACTED"));
+        Log.d(TAG, "HTTP " + code);
 
-        BufferedReader reader = new BufferedReader(
-                new InputStreamReader(
-                        code >= 400 ? conn.getErrorStream() : conn.getInputStream(),
-                        "UTF-8"));
+        BufferedReader reader = new BufferedReader(new InputStreamReader(
+                code >= 400 ? conn.getErrorStream() : conn.getInputStream(), "UTF-8"));
         StringBuilder sb = new StringBuilder();
         String line;
         while ((line = reader.readLine()) != null) sb.append(line);
         reader.close();
 
         if (code >= 400) {
-            Log.w(TAG, "Gemini error " + code + ": " + sb.toString());
+            Log.w(TAG, "Gemini HTTP " + code + ": " + sb);
             return null;
         }
-
         return sb.toString();
     }
 
-    private static ClassificationResult parseResponseToResult(String response) {
+    private static ClassificationResult parseResponse(String response) {
         try {
-            // The model response historically included a `candidates` array.
-            // Extract the model-generated text from that structure if present,
-            // otherwise work with the raw response. Then attempt to parse a
-            // JSON object from the returned text.
+            // Extract model text from candidates array
             String text = null;
             try {
-                JSONObject obj = new JSONObject(response);
-                JSONArray candidates = obj.optJSONArray("candidates");
+                JSONObject root = new JSONObject(response);
+                JSONArray candidates = root.optJSONArray("candidates");
                 if (candidates != null && candidates.length() > 0) {
                     JSONObject content = candidates.getJSONObject(0).optJSONObject("content");
                     if (content != null) {
@@ -178,37 +193,47 @@ public class GeminiClassifier {
                         }
                     }
                 }
-            } catch (Exception ignored) {
-            }
+            } catch (Exception ignored) {}
 
             if (text == null) text = response;
 
-            // Try to extract a JSON object from the model text.
+            // Strip markdown code fences if model wraps in ```json ... ```
+            text = text.replaceAll("(?s)```json\\s*", "").replaceAll("(?s)```\\s*", "").trim();
+
+            // Extract first JSON object from the text
             int start = text.indexOf('{');
-            int end = text.lastIndexOf('}');
-            if (start >= 0 && end > start) {
-                String jsonPart = text.substring(start, end + 1);
-                try {
-                    JSONObject out = new JSONObject(jsonPart);
-                    String category = out.optString("category", "Other");
-                    String vendor = out.optString("vendor", "");
-                    String amountStr = out.optString("amount", "");
-                    String type = out.optString("type", null);
-                    Double amount = null;
-                    if (!amountStr.isEmpty()) {
-                        try {
-                            amount = Double.parseDouble(amountStr.replaceAll("[^0-9\\.\\-]", ""));
-                        } catch (Exception ignore) {
-                        }
-                    }
-                    return new ClassificationResult(category, vendor, amount, type);
-                } catch (Exception je) {
-                    Log.w(TAG, "Failed to parse JSON from model text", je);
-                }
+            int end   = text.lastIndexOf('}');
+            if (start < 0 || end <= start) {
+                Log.w(TAG, "No JSON found in response");
+                return null;
             }
 
-            // If we couldn't parse JSON, return null so caller can decide fallback.
-            return null;
+            JSONObject out = new JSONObject(text.substring(start, end + 1));
+
+            boolean isTxn    = out.optBoolean("is_transaction", true);
+            String category  = out.optString("category", "Other");
+            String merchant  = out.optString("merchant", "");
+            String amountStr = out.optString("amount", "");
+            String type      = out.optString("type", "outgoing");
+            String date      = out.optString("date", "");
+
+            // If model says not a transaction, still return result so caller
+            // can decide to skip or mark as Other
+            if (!isTxn) {
+                return new ClassificationResult("Other", merchant, null, "outgoing", null);
+            }
+
+            // Parse amount
+            Double amount = null;
+            if (!amountStr.isEmpty()) {
+                try {
+                    amount = Double.parseDouble(amountStr.replaceAll("[^0-9.\\-]", ""));
+                } catch (NumberFormatException ignored) {}
+            }
+
+            String dateResult = (date != null && date.matches("\\d{4}-\\d{2}-\\d{2}")) ? date : null;
+
+            return new ClassificationResult(category, merchant, amount, type, dateResult);
 
         } catch (Exception e) {
             Log.e(TAG, "Failed to parse Gemini response", e);

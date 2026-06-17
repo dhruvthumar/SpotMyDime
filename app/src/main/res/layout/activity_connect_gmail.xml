@@ -16,11 +16,11 @@
 
         <ImageView
                 android:id="@+id/iv_gmail_logo"
-                android:layout_width="96dp"
-                android:layout_height="96dp"
-                android:src="@android:drawable/ic_dialog_email"
+                android:layout_width="105dp"
+                android:layout_height="105dp"
+                android:src="@drawable/gmail_big"
                 android:scaleType="fitCenter"
-                android:alpha="0.7"
+                android:alpha="1.0"
                 android:contentDescription="Gmail logo"
                 app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
@@ -34,7 +34,7 @@
                 android:textColor="@color/text_primary"
                 android:textSize="24sp"
                 android:gravity="center"
-                android:fontFamily="@font/google_sans_flex_24pt"
+                android:fontFamily="@font/googlesansflex_24pt_bold"
                 android:fontWeight="600"
                 android:layout_marginTop="20dp"
                 app:layout_constraintTop_toBottomOf="@id/iv_gmail_logo"
@@ -49,6 +49,7 @@
                 android:textColor="@color/text_secondary"
                 android:textSize="15sp"
                 android:gravity="center"
+                android:fontFamily="@font/googlesansflex_24pt_semibold"
                 android:lineSpacingMultiplier="1.6"
                 android:layout_marginTop="10dp"
                 app:layout_constraintTop_toBottomOf="@id/tv_title"
@@ -61,7 +62,6 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:background="@drawable/card_bg"
                 android:padding="16dp"
                 android:layout_marginTop="36dp"
                 app:layout_constraintTop_toBottomOf="@id/tv_desc"
@@ -111,7 +111,6 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:background="@drawable/card_bg"
                 android:padding="16dp"
                 android:layout_marginTop="12dp"
                 app:layout_constraintTop_toBottomOf="@id/trust_1"
@@ -161,7 +160,6 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:background="@drawable/card_bg"
                 android:padding="16dp"
                 android:layout_marginTop="12dp"
                 app:layout_constraintTop_toBottomOf="@id/trust_2"
@@ -214,12 +212,11 @@
                 android:textSize="17sp"
                 android:backgroundTint="@color/green_primary"
                 android:stateListAnimator="@null"
-                android:layout_marginTop="36dp"
+                android:layout_marginTop="32dp"
                 app:layout_constraintTop_toBottomOf="@id/trust_3"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent"
-                app:cornerRadius="16dp" />
-
+                app:cornerRadius="16dp" app:layout_constraintHorizontal_bias="0.0"/>
         <TextView
                 android:id="@+id/tv_privacy"
                 android:layout_width="wrap_content"
@@ -227,10 +224,10 @@
                 android:text="@string/connect_privacy"
                 android:textColor="@color/text_tertiary"
                 android:textSize="13sp"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="12dp"
                 app:layout_constraintTop_toBottomOf="@id/btn_connect_gmail"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent" />
+                app:layout_constraintEnd_toEndOf="parent" app:layout_constraintHorizontal_bias="0.473"/>
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </ScrollView>

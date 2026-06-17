@@ -28,7 +28,6 @@
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
 
-                <!-- ── TOP BAR ── -->
                 <RelativeLayout
                         android:layout_width="match_parent"
                         android:layout_height="56dp"
@@ -81,7 +80,6 @@
                             android:contentDescription="Notifications" />
                 </RelativeLayout>
 
-                <!-- ── GREETING ── -->
                 <TextView
                         android:id="@+id/tv_greeting"
                         android:layout_width="wrap_content"
@@ -92,7 +90,6 @@
                         android:layout_marginStart="20dp"
                         android:layout_marginTop="8dp" />
 
-                <!-- ── THIS MONTH CARD ── -->
                 <androidx.cardview.widget.CardView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -167,7 +164,6 @@
                     </RelativeLayout>
                 </androidx.cardview.widget.CardView>
 
-                <!-- ── TOP CATEGORIES ── -->
                 <RelativeLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -204,7 +200,7 @@
             </LinearLayout>
 
             <!-- ════════════════════════════════════════════════════ -->
-            <!-- TAB 2 – TRANSACTIONS / DOCUMENT CONTENT             -->
+            <!-- TAB 2 – TRANSACTIONS                                -->
             <!-- ════════════════════════════════════════════════════ -->
             <LinearLayout
                     android:id="@+id/container_document"
@@ -213,7 +209,6 @@
                     android:orientation="vertical"
                     android:visibility="gone">
 
-                <!-- ── HEADER ── -->
                 <RelativeLayout
                         android:layout_width="match_parent"
                         android:layout_height="56dp"
@@ -241,7 +236,6 @@
                             android:layout_centerVertical="true" />
                 </RelativeLayout>
 
-                <!-- ── SEARCH BAR ── -->
                 <EditText
                         android:id="@+id/et_search"
                         android:layout_width="match_parent"
@@ -258,7 +252,6 @@
                         android:inputType="text"
                         android:imeOptions="actionSearch" />
 
-                <!-- ── FILTER BAR ── -->
                 <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="80dp"
@@ -333,7 +326,6 @@
                                 android:padding="12dp" />
                     </LinearLayout>
 
-
                 </LinearLayout>
 
                 <TextView
@@ -369,7 +361,7 @@
             </LinearLayout>
 
             <!-- ════════════════════════════════════════════════════ -->
-            <!-- TAB 3 – MANUAL ENTRY (ADD EXPENSE / INCOME)        -->
+            <!-- TAB 3 – ADD EXPENSE / INCOME                        -->
             <!-- ════════════════════════════════════════════════════ -->
             <LinearLayout
                     android:id="@+id/container_add"
@@ -378,7 +370,6 @@
                     android:orientation="vertical"
                     android:visibility="gone">
 
-                <!-- ── HEADER ── -->
                 <RelativeLayout
                         android:layout_width="match_parent"
                         android:layout_height="64dp"
@@ -405,7 +396,6 @@
                             android:layout_centerInParent="true" />
                 </RelativeLayout>
 
-                <!-- ── EXPENSE / INCOME TOGGLE ── -->
                 <LinearLayout
                         android:id="@+id/toggle_container"
                         android:layout_width="match_parent"
@@ -445,7 +435,6 @@
 
                 </LinearLayout>
 
-                <!-- ── FORM FIELDS ── -->
                 <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -453,7 +442,6 @@
                         android:paddingHorizontal="32dp"
                         android:layout_marginTop="32dp">
 
-                    <!-- Date -->
                     <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
@@ -477,7 +465,6 @@
                             android:clickable="true"
                             android:focusable="true" />
 
-                    <!-- Category -->
                     <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
@@ -501,7 +488,6 @@
                             android:clickable="true"
                             android:focusable="true" />
 
-                    <!-- Amount -->
                     <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
@@ -524,7 +510,6 @@
                             android:layout_marginBottom="20dp"
                             android:inputType="numberDecimal" />
 
-                    <!-- Payment Method -->
                     <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
@@ -548,7 +533,6 @@
                             android:clickable="true"
                             android:focusable="true" />
 
-                    <!-- Notes -->
                     <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
@@ -572,7 +556,6 @@
 
                 </LinearLayout>
 
-                <!-- ── SAVE BUTTON ── -->
                 <TextView
                         android:id="@+id/btn_save"
                         android:layout_width="wrap_content"
@@ -591,7 +574,7 @@
             </LinearLayout>
 
             <!-- ════════════════════════════════════════════════════ -->
-            <!-- TAB 4 – INSIGHTS CONTENT                            -->
+            <!-- TAB 4 – INSIGHTS                                    -->
             <!-- ════════════════════════════════════════════════════ -->
             <LinearLayout
                     android:id="@+id/container_insights"
@@ -599,60 +582,270 @@
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
                     android:visibility="gone"
-                    android:paddingTop="16dp"
+                    android:background="#F5F0E8"
                     android:paddingBottom="24dp">
 
                 <!-- ── HEADER ── -->
-                <RelativeLayout
-                        android:layout_width="match_parent"
+                <TextView
+                        android:id="@+id/tv_insights_title"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:paddingHorizontal="20dp"
-                        android:paddingVertical="12dp">
+                        android:text="Insights"
+                        android:textColor="#111111"
+                        android:textSize="26sp"
+                        android:textStyle="bold"
+                        android:layout_marginStart="20dp"
+                        android:layout_marginTop="24dp"
+                        android:layout_marginBottom="16dp" />
 
-                    <TextView
-                            android:id="@+id/tv_insights_title"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Insights"
-                            android:textColor="#111111"
-                            android:textSize="24sp"
-                            android:textStyle="bold"
-                            android:layout_centerVertical="true" />
-
-                </RelativeLayout>
-
-                <!-- ── Divider ── -->
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="#E0D5C0"
-                    android:layout_marginHorizontal="20dp" />
-
-                <!-- ── SUB-NAVIGATION ROW (All Accounts, Spending, Income, Trends) ── -->
+                <!-- ── SUB-NAV CHIPS: Overview / Spending / Income / Trends ── -->
                 <HorizontalScrollView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="16dp"
                         android:scrollbars="none"
-                        android:paddingHorizontal="16dp">
+                        android:paddingHorizontal="20dp"
+                        android:layout_marginBottom="20dp">
 
                     <LinearLayout
                             android:id="@+id/insights_sub_nav"
                             android:layout_width="wrap_content"
-                            android:layout_height="48dp"
+                            android:layout_height="44dp"
                             android:orientation="horizontal"
                             android:gravity="center_vertical" />
 
                 </HorizontalScrollView>
 
-                <!-- ── SUB-TAB CONTENT CONTAINER ── -->
+                <!-- ── MAIN OVERVIEW CARD ── -->
+                <androidx.cardview.widget.CardView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginHorizontal="20dp"
+                        app:cardBackgroundColor="#FFFFFF"
+                        app:cardCornerRadius="16dp"
+                        app:cardElevation="3dp">
+
+                    <RelativeLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:padding="20dp">
+
+                        <LinearLayout
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:layout_alignParentStart="true"
+                                android:layout_toStartOf="@+id/insights_chart_container"
+                                android:layout_marginEnd="12dp">
+
+                            <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Spending Overview"
+                                    android:textColor="#111111"
+                                    android:textSize="15sp"
+                                    android:textStyle="bold" />
+
+                            <TextView
+                                    android:id="@+id/tv_insights_net"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="$0.00"
+                                    android:textColor="#111111"
+                                    android:textSize="28sp"
+                                    android:textStyle="bold"
+                                    android:layout_marginTop="10dp" />
+
+                            <TextView
+                                    android:id="@+id/tv_insights_net_label"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Net Cash Flow"
+                                    android:textColor="#888888"
+                                    android:textSize="13sp"
+                                    android:layout_marginTop="2dp" />
+
+                            <LinearLayout
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="horizontal"
+                                    android:gravity="center_vertical"
+                                    android:layout_marginTop="10dp">
+
+                                <TextView
+                                        android:id="@+id/tv_insights_trend"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="↑ 0% vs last month"
+                                        android:textColor="#2E7D32"
+                                        android:textSize="13sp" />
+                            </LinearLayout>
+
+                        </LinearLayout>
+
+                        <!-- Donut chart placeholder — filled at runtime -->
+                        <FrameLayout
+                                android:id="@+id/insights_chart_container"
+                                android:layout_width="90dp"
+                                android:layout_height="90dp"
+                                android:layout_alignParentEnd="true"
+                                android:layout_centerVertical="true" />
+
+                    </RelativeLayout>
+                </androidx.cardview.widget.CardView>
+
+                <!-- ── STATS ROW: Income / Expense / Savings Rate ── -->
+                <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="20dp"
+                        android:layout_marginTop="14dp">
+
+                    <!-- Income -->
+                    <androidx.cardview.widget.CardView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="6dp"
+                            app:cardBackgroundColor="#FFFFFF"
+                            app:cardCornerRadius="14dp"
+                            app:cardElevation="2dp">
+
+                        <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:padding="14dp">
+
+                            <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Cash In"
+                                    android:textColor="#888888"
+                                    android:textSize="12sp" />
+
+                            <TextView
+                                    android:id="@+id/tv_insights_cash_in"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="$0.00"
+                                    android:textColor="#2E7D32"
+                                    android:textSize="15sp"
+                                    android:textStyle="bold"
+                                    android:layout_marginTop="4dp" />
+
+                            <TextView
+                                    android:id="@+id/tv_insights_cash_in_trend"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="↑ 0%"
+                                    android:textColor="#2E7D32"
+                                    android:textSize="11sp"
+                                    android:layout_marginTop="3dp" />
+
+                        </LinearLayout>
+                    </androidx.cardview.widget.CardView>
+
+                    <!-- Expense -->
+                    <androidx.cardview.widget.CardView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginHorizontal="3dp"
+                            app:cardBackgroundColor="#FFFFFF"
+                            app:cardCornerRadius="14dp"
+                            app:cardElevation="2dp">
+
+                        <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:padding="14dp">
+
+                            <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Cash Out"
+                                    android:textColor="#888888"
+                                    android:textSize="12sp" />
+
+                            <TextView
+                                    android:id="@+id/tv_insights_cash_out"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="$0.00"
+                                    android:textColor="#E53935"
+                                    android:textSize="15sp"
+                                    android:textStyle="bold"
+                                    android:layout_marginTop="4dp" />
+
+                            <TextView
+                                    android:id="@+id/tv_insights_cash_out_trend"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="↑ 0%"
+                                    android:textColor="#E53935"
+                                    android:textSize="11sp"
+                                    android:layout_marginTop="3dp" />
+
+                        </LinearLayout>
+                    </androidx.cardview.widget.CardView>
+
+                    <!-- Savings Rate -->
+                    <androidx.cardview.widget.CardView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginStart="6dp"
+                            app:cardBackgroundColor="#FFFFFF"
+                            app:cardCornerRadius="14dp"
+                            app:cardElevation="2dp">
+
+                        <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:padding="14dp">
+
+                            <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Savings"
+                                    android:textColor="#888888"
+                                    android:textSize="12sp" />
+
+                            <TextView
+                                    android:id="@+id/tv_insights_savings_rate"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="0%"
+                                    android:textColor="#111111"
+                                    android:textSize="15sp"
+                                    android:textStyle="bold"
+                                    android:layout_marginTop="4dp" />
+
+                            <TextView
+                                    android:id="@+id/tv_insights_savings_trend"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="↑ 0%"
+                                    android:textColor="#2E7D32"
+                                    android:textSize="11sp"
+                                    android:layout_marginTop="3dp" />
+
+                        </LinearLayout>
+                    </androidx.cardview.widget.CardView>
+
+                </LinearLayout>
+
+                <!-- ── INSIGHT CARDS (injected at runtime via container_insights_content) ── -->
                 <LinearLayout
                         android:id="@+id/container_insights_content"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
-                        android:layout_marginTop="20dp"
-                        android:paddingHorizontal="16dp" />
+                        android:paddingHorizontal="20dp"
+                        android:layout_marginTop="10dp" />
 
             </LinearLayout>
 
@@ -677,7 +870,6 @@
             android:paddingHorizontal="6dp"
             android:clipToPadding="false">
 
-        <!-- Tab 1 -->
         <LinearLayout
                 android:id="@+id/nav_home"
                 android:layout_width="0dp"
@@ -688,7 +880,6 @@
                 android:clickable="true"
                 android:focusable="true"
                 android:foreground="?attr/selectableItemBackground">
-
             <ImageView
                     android:id="@+id/ic_nav_home"
                     android:layout_width="30dp"
@@ -697,7 +888,6 @@
                     android:contentDescription="Tab 1" />
         </LinearLayout>
 
-        <!-- Tab 2 -->
         <LinearLayout
                 android:id="@+id/nav_document"
                 android:layout_width="0dp"
@@ -708,7 +898,6 @@
                 android:clickable="true"
                 android:focusable="true"
                 android:foreground="?attr/selectableItemBackground">
-
             <ImageView
                     android:id="@+id/ic_nav_document"
                     android:layout_width="30dp"
@@ -717,7 +906,6 @@
                     android:contentDescription="Tab 2" />
         </LinearLayout>
 
-        <!-- Tab 3 -->
         <LinearLayout
                 android:id="@+id/nav_add"
                 android:layout_width="0dp"
@@ -728,7 +916,6 @@
                 android:clickable="true"
                 android:focusable="true"
                 android:foreground="?attr/selectableItemBackground">
-
             <ImageView
                     android:id="@+id/ic_nav_add"
                     android:layout_width="30dp"
@@ -737,7 +924,6 @@
                     android:contentDescription="Tab 3" />
         </LinearLayout>
 
-        <!-- Tab 4 – Insights -->
         <LinearLayout
                 android:id="@+id/nav_insights"
                 android:layout_width="0dp"
@@ -748,17 +934,14 @@
                 android:clickable="true"
                 android:focusable="true"
                 android:foreground="?attr/selectableItemBackground">
-
             <ImageView
                     android:id="@+id/ic_nav_insights"
                     android:layout_width="30dp"
                     android:layout_height="30dp"
                     android:src="@drawable/tab_4"
                     android:contentDescription="Tab 4" />
-
         </LinearLayout>
 
-        <!-- Tab 5 -->
         <LinearLayout
                 android:id="@+id/nav_settings"
                 android:layout_width="0dp"
@@ -769,7 +952,6 @@
                 android:clickable="true"
                 android:focusable="true"
                 android:foreground="?attr/selectableItemBackground">
-
             <ImageView
                     android:id="@+id/ic_nav_settings"
                     android:layout_width="30dp"

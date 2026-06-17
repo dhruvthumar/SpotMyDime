@@ -6,7 +6,7 @@
     <string name="onboarding_desc">We read your transaction emails and turn them into powerful spending insights.</string>
     <string name="onboarding_feature_1">No bank login</string>
     <string name="onboarding_feature_2">No manual entry</string>
-    <string name="onboarding_feature_3">100%% private &amp; local</string>
+    <string name="onboarding_feature_3">100% private &amp; local</string>
     <string name="onboarding_cta">Let\'s Go</string>
 
     <!-- Connect Gmail -->

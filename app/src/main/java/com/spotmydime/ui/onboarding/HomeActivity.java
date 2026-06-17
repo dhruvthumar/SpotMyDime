@@ -223,11 +223,11 @@ public class HomeActivity extends AppCompatActivity {
             tab.setText(insightSubTabLabels[i]);
             tab.setTextSize(14);
             tab.setTypeface(null, android.graphics.Typeface.BOLD);
-            tab.setPadding(24, 10, 24, 10);
+            tab.setPadding(dp(20), dp(8), dp(20), dp(8));
             tab.setGravity(android.view.Gravity.CENTER);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT, 40);
-            lp.setMargins(6, 0, 6, 0);
+                    LinearLayout.LayoutParams.WRAP_CONTENT, dp(38));
+            lp.setMargins(dp(5), 0, dp(5), 0);
             tab.setLayoutParams(lp);
             tab.setClickable(true);
             tab.setFocusable(true);
@@ -248,8 +248,8 @@ public class HomeActivity extends AppCompatActivity {
                 tab.setBackgroundResource(R.drawable.nav_bg_active);
                 tab.setTextColor(0xFFFFFFFF);
             } else {
-                tab.setBackground(null);
-                tab.setTextColor(0xFFF9AC54);
+                tab.setBackgroundResource(R.drawable.bg_chip_outline);
+                tab.setTextColor(0xFF888888);
             }
         }
     }
@@ -267,14 +267,19 @@ public class HomeActivity extends AppCompatActivity {
 
     // ── CARD HELPERS ──
 
+    private int dp(int dp) {
+        return (int) (dp * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
     private LinearLayout createCard() {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setBackgroundResource(R.drawable.card_bg);
-        card.setPadding(20, 20, 20, 20);
+        card.setPadding(dp(16), dp(18), dp(16), dp(18));
+        card.setElevation(dp(2));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.bottomMargin = 16;
+        lp.bottomMargin = dp(14);
         card.setLayoutParams(lp);
         return card;
     }
@@ -403,7 +408,7 @@ public class HomeActivity extends AppCompatActivity {
                 canvas.drawCircle(cx, cy, r * 0.55f, paint);
             }
         };
-        donut.setLayoutParams(new LinearLayout.LayoutParams(100, 100));
+        donut.setLayoutParams(new LinearLayout.LayoutParams(dp(90), dp(90)));
         ovRow.addView(ovLeft);
         ovRow.addView(donut);
         ovCard.addView(ovRow);
@@ -425,9 +430,10 @@ public class HomeActivity extends AppCompatActivity {
             LinearLayout statCard = new LinearLayout(this);
             statCard.setOrientation(LinearLayout.VERTICAL);
             statCard.setBackgroundResource(R.drawable.card_bg);
-            statCard.setPadding(14, 14, 14, 14);
+            statCard.setPadding(dp(12), dp(12), dp(12), dp(12));
+            statCard.setElevation(dp(1));
             LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-            slp.setMargins(4, 0, 4, 0);
+            slp.setMargins(dp(4), 0, dp(4), 0);
             statCard.setLayoutParams(slp);
 
             TextView tvLabel = new TextView(this);
@@ -455,12 +461,12 @@ public class HomeActivity extends AppCompatActivity {
             statsRow.addView(statCard);
         }
         containerInsightsContent.addView(statsRow);
-        addSpacer(containerInsightsContent, 4);
+        addSpacer(containerInsightsContent, dp(6));
 
         // ── Forecast Card ──
         LinearLayout fcCard = createCard();
         addCardHeader(fcCard, "Cash Forecast", null);
-        addSpacer(fcCard, 8);
+        addSpacer(fcCard, dp(8));
         TextView fcBody = new TextView(this);
         fcBody.setText("Current trends indicate your cash flow remains healthy. "
                 + "With $" + String.format("%.2f", totalIn) + " coming in and $"
@@ -474,16 +480,16 @@ public class HomeActivity extends AppCompatActivity {
         containerInsightsContent.addView(fcCard);
 
         // ── Classify with AI Button ──
-        addSpacer(containerInsightsContent, 4);
+        addSpacer(containerInsightsContent, dp(6));
         Button btnClassify = new Button(this);
         btnClassify.setText("Classify All with AI");
         btnClassify.setTextSize(15);
         btnClassify.setTextColor(0xFFFFFFFF);
         btnClassify.setBackgroundResource(R.drawable.nav_bg_active);
-        btnClassify.setPadding(24, 14, 24, 14);
+        btnClassify.setPadding(dp(20), dp(12), dp(20), dp(12));
         btnClassify.setAllCaps(false);
         LinearLayout.LayoutParams btnLp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, 48);
+                LinearLayout.LayoutParams.WRAP_CONTENT, dp(44));
         btnLp.gravity = android.view.Gravity.CENTER_HORIZONTAL;
         btnClassify.setLayoutParams(btnLp);
         btnClassify.setOnClickListener(v -> classifyAllWithGemini());
@@ -515,7 +521,7 @@ public class HomeActivity extends AppCompatActivity {
         tvChange.setTextColor(isDown ? 0xFF4CAF50 : 0xFFE53935);
         tvChange.setTypeface(null, android.graphics.Typeface.BOLD);
         spCard.addView(tvChange);
-        addSpacer(spCard, 12);
+        addSpacer(spCard, dp(12));
 
         // Simple line chart view
         final double[] chartValues = {totalOut * 1.1, totalOut * 0.9, totalOut * 1.05, totalOut * 0.95, totalOut * 1.02, totalOut};
@@ -568,7 +574,7 @@ public class HomeActivity extends AppCompatActivity {
             }
         };
         lineChart.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 160));
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(120)));
         spCard.addView(lineChart);
         containerInsightsContent.addView(spCard);
 
@@ -586,7 +592,7 @@ public class HomeActivity extends AppCompatActivity {
 
         LinearLayout catCard = createCard();
         addCardHeader(catCard, "Top Spending Categories", "Budget %");
-        addSpacer(catCard, 8);
+        addSpacer(catCard, dp(8));
 
         for (Map.Entry<String, Double> entry : sortedCats) {
             LinearLayout catRow = new LinearLayout(this);
@@ -649,7 +655,7 @@ public class HomeActivity extends AppCompatActivity {
             catRow.addView(tvPct);
 
             catCard.addView(catRow);
-            addSpacer(catCard, 6);
+            addSpacer(catCard, dp(6));
         }
         containerInsightsContent.addView(catCard);
     }
@@ -691,7 +697,7 @@ public class HomeActivity extends AppCompatActivity {
         TextView walletIcon = new TextView(this);
         walletIcon.setText("💰");
         walletIcon.setTextSize(40);
-        walletIcon.setLayoutParams(new LinearLayout.LayoutParams(80, 80));
+        walletIcon.setLayoutParams(new LinearLayout.LayoutParams(dp(64), dp(64)));
         inRow.addView(walletIcon);
 
         inCard.addView(inRow);
@@ -709,7 +715,7 @@ public class HomeActivity extends AppCompatActivity {
 
         LinearLayout srcCard = createCard();
         addCardHeader(srcCard, "Highest Income Source", null);
-        addSpacer(srcCard, 8);
+        addSpacer(srcCard, dp(8));
 
         LinearLayout srcRow = new LinearLayout(this);
         srcRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -719,7 +725,7 @@ public class HomeActivity extends AppCompatActivity {
         TextView srcIcon = new TextView(this);
         srcIcon.setText("📅");
         srcIcon.setTextSize(32);
-        srcIcon.setLayoutParams(new LinearLayout.LayoutParams(56, 56));
+        srcIcon.setLayoutParams(new LinearLayout.LayoutParams(dp(48), dp(48)));
         srcRow.addView(srcIcon);
 
         LinearLayout srcInfo = new LinearLayout(this);
@@ -820,14 +826,14 @@ public class HomeActivity extends AppCompatActivity {
             }
         };
         barChart.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 180));
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(140)));
         trCard.addView(barChart);
         containerInsightsContent.addView(trCard);
 
         // ── Key Insight Card ──
         LinearLayout kiCard = createCard();
         addCardHeader(kiCard, "Key Insight", null);
-        addSpacer(kiCard, 8);
+        addSpacer(kiCard, dp(8));
 
         double spendRatio = totalIn > 0 ? (totalOut / totalIn) * 100 : 0;
         TextView kiBody = new TextView(this);
@@ -948,22 +954,44 @@ public class HomeActivity extends AppCompatActivity {
                     merged.addAll(transactions);
                     merged.sort((a, b) -> Long.compare(b.getDateMillis(), a.getDateMillis()));
 
-                    // Deduplicate: same sender/merchant + same date + same amount = duplicate
+                    // Deduplicate: same merchant + same day + same amount = duplicate.
+                    // Normalize date to day-boundary so emails about the same transaction
+                    // arriving at slightly different times are caught. Keep the more
+                    // informative entry — prefer Gmail (has messageId) over manual.
                     Set<String> seen = new HashSet<>();
                     List<Transaction> deduped = new ArrayList<>();
                     for (Transaction tx : merged) {
-                        String dedupKey = (tx.getSenderEmail() != null ? tx.getSenderEmail() : tx.getMerchant())
-                                + "|" + tx.getDateMillis() + "|" + tx.getAmount();
+                        String merchant = tx.getMerchant() != null ? tx.getMerchant().toLowerCase().trim() : "";
+                        if (merchant.isEmpty()) continue;
+                        // Round to start of day
+                        long dayStart = (tx.getDateMillis() / 86400000L) * 86400000L;
+                        String dedupKey = merchant + "|" + dayStart + "|" + tx.getAmount();
                         if (!seen.contains(dedupKey)) {
                             seen.add(dedupKey);
                             deduped.add(tx);
+                        } else {
+                            // Duplicate found — replace the existing entry if this one is
+                            // more informative (has a real messageId vs manual_ prefixed).
+                            for (int i = 0; i < deduped.size(); i++) {
+                                Transaction existing = deduped.get(i);
+                                String existingKey = (existing.getMerchant() != null ? existing.getMerchant().toLowerCase().trim() : "")
+                                        + "|" + dayStart + "|" + existing.getAmount();
+                                if (existingKey.equals(dedupKey)) {
+                                    boolean existingIsManual = existing.getMessageId() != null && existing.getMessageId().startsWith("manual_");
+                                    boolean txIsGmail = tx.getMessageId() != null && !tx.getMessageId().startsWith("manual_");
+                                    if (existingIsManual && txIsGmail) {
+                                        deduped.set(i, tx);
+                                    }
+                                    break;
+                                }
+                            }
                         }
                     }
                     allTransactions = deduped;
-                    if (merged.isEmpty()) {
+                    if (deduped.isEmpty()) {
                         addEmptyState();
                     } else {
-                        populateDashboard(merged);
+                        populateDashboard(deduped);
                     }
                 });
             }
