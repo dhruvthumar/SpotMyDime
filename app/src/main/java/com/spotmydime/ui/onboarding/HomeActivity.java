@@ -36,6 +36,9 @@ import com.spotmydime.data.ExcludedMessageStore;
 import com.spotmydime.data.VendorAliasStore;
 import com.spotmydime.data.TransactionOverrideStore;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -292,11 +295,11 @@ public class HomeActivity extends AppCompatActivity {
             tab.setText(insightSubTabLabels[i]);
             tab.setTextSize(14);
             tab.setTypeface(null, android.graphics.Typeface.BOLD);
-            tab.setPadding(dp(20), dp(8), dp(20), dp(8));
+            tab.setPadding(dp(16), dp(8), dp(16), dp(8));
             tab.setGravity(android.view.Gravity.CENTER);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT, dp(38));
-            lp.setMargins(dp(5), 0, dp(5), 0);
+            lp.setMargins(dp(3), 0, dp(3), 0);
             tab.setLayoutParams(lp);
             tab.setClickable(true);
             tab.setFocusable(true);
@@ -395,6 +398,11 @@ public class HomeActivity extends AppCompatActivity {
         return monthNames[month] + " " + year;
     }
 
+    private String formatCurrency(double amount) {
+        String prefix = amount < 0 ? "-$" : "$";
+        return prefix + String.format("%,.2f", Math.abs(amount));
+    }
+
     // ── SCREEN 1: OVERVIEW ──
 
     private void populateOverview() {
@@ -420,58 +428,73 @@ public class HomeActivity extends AppCompatActivity {
         }
         double prevNet = prevIn - prevOut;
 
-        double pctChange = prevNet != 0 ? ((netCashFlow - prevNet) / Math.abs(prevNet)) * 100 : 0;
+        boolean hasPrevNet = prevNet != 0;
+        double pctChange = hasPrevNet ? ((netCashFlow - prevNet) / Math.abs(prevNet)) * 100 : 0;
         double savingsRate = totalIn > 0 ? (netCashFlow / totalIn) * 100 : 0;
 
         // Main card
-        tvInsightsNet.setText("$" + String.format("%.2f", netCashFlow));
+        tvInsightsNet.setText(formatCurrency(netCashFlow));
         tvInsightsNetLabel.setText("Net Cash Flow");
-        String trendArrow = pctChange >= 0 ? "↑" : "↓";
-        tvInsightsTrend.setText(trendArrow + " " + String.format("%.0f", Math.abs(pctChange)) + "% vs last month");
-        tvInsightsTrend.setTextColor(pctChange >= 0 ? 0xFF2B9348 : 0xFFE53935);
+        if (hasPrevNet) {
+            String trendArrow = pctChange >= 0 ? "↑" : "↓";
+            tvInsightsTrend.setText(trendArrow + " " + String.format("%.0f", Math.abs(pctChange)) + "% vs last month");
+            tvInsightsTrend.setTextColor(pctChange >= 0 ? 0xFF2B9348 : 0xFFE53935);
+            tvInsightsTrend.setVisibility(View.VISIBLE);
+        } else {
+            tvInsightsTrend.setText("New Wallet");
+            tvInsightsTrend.setTextColor(0xFFD4A373);
+            tvInsightsTrend.setVisibility(View.VISIBLE);
+        }
 
         // Micro cards — dynamic trends
-        double pctIn = prevIn != 0 ? ((totalIn - prevIn) / Math.abs(prevIn)) * 100 : 0;
-        tvMicroIncomeVal.setText("$" + String.format("%.2f", totalIn));
-        String inArrow = pctIn >= 0 ? "↑" : "↓";
-        tvMicroIncomeTrend.setText(inArrow + " " + String.format("%.0f", Math.abs(pctIn)) + "%");
-        tvMicroIncomeTrend.setTextColor(pctIn >= 0 ? 0xFF2B9348 : 0xFFE53935);
+        boolean hasPrevIn = prevIn != 0;
+        double pctIn = hasPrevIn ? ((totalIn - prevIn) / Math.abs(prevIn)) * 100 : 0;
+        tvMicroIncomeVal.setText(formatCurrency(totalIn));
+        if (hasPrevIn) {
+            String inArrow = pctIn >= 0 ? "↑" : "↓";
+            tvMicroIncomeTrend.setText(inArrow + " " + String.format("%.0f", Math.abs(pctIn)) + "%");
+            tvMicroIncomeTrend.setTextColor(pctIn >= 0 ? 0xFF2B9348 : 0xFFE53935);
+        } else {
+            tvMicroIncomeTrend.setText("—");
+            tvMicroIncomeTrend.setTextColor(0xFFD4A373);
+        }
 
-        double pctOut = prevOut != 0 ? ((totalOut - prevOut) / Math.abs(prevOut)) * 100 : 0;
-        tvMicroExpenseVal.setText("$" + String.format("%.2f", totalOut));
-        String outArrow = pctOut <= 0 ? "↓" : "↑";
-        tvMicroExpenseTrend.setText(outArrow + " " + String.format("%.0f", Math.abs(pctOut)) + "%");
-        // Spending down = green, up = red
-        tvMicroExpenseTrend.setTextColor(pctOut <= 0 ? 0xFF2B9348 : 0xFFE53935);
+        boolean hasPrevOut = prevOut != 0;
+        double pctOut = hasPrevOut ? ((totalOut - prevOut) / Math.abs(prevOut)) * 100 : 0;
+        tvMicroExpenseVal.setText(formatCurrency(totalOut));
+        if (hasPrevOut) {
+            String outArrow = pctOut <= 0 ? "↓" : "↑";
+            tvMicroExpenseTrend.setText(outArrow + " " + String.format("%.0f", Math.abs(pctOut)) + "%");
+            tvMicroExpenseTrend.setTextColor(pctOut <= 0 ? 0xFF2B9348 : 0xFFE53935);
+        } else {
+            tvMicroExpenseTrend.setText("—");
+            tvMicroExpenseTrend.setTextColor(0xFFD4A373);
+        }
 
         tvMicroSavingsVal.setText(String.format("%.0f", savingsRate) + "%");
         double prevRate = prevIn > 0 ? ((prevIn - prevOut) / prevIn) * 100 : 0;
-        double pctSavingsTrend = prevRate != 0 ? ((savingsRate - prevRate) / Math.abs(prevRate)) * 100 : 0;
-        String svArrow = pctSavingsTrend >= 0 ? "↑" : "↓";
-        tvMicroSavingsTrend.setText(svArrow + " " + String.format("%.0f", Math.abs(pctSavingsTrend)) + "%");
-        tvMicroSavingsTrend.setTextColor(pctSavingsTrend >= 0 ? 0xFF2B9348 : 0xFFE53935);
+        boolean hasPrevRate = prevRate != 0;
+        double pctSavingsTrend = hasPrevRate ? ((savingsRate - prevRate) / Math.abs(prevRate)) * 100 : 0;
+        if (hasPrevRate) {
+            String svArrow = pctSavingsTrend >= 0 ? "↑" : "↓";
+            tvMicroSavingsTrend.setText(svArrow + " " + String.format("%.0f", Math.abs(pctSavingsTrend)) + "%");
+            tvMicroSavingsTrend.setTextColor(pctSavingsTrend >= 0 ? 0xFF2B9348 : 0xFFE53935);
+        } else {
+            tvMicroSavingsTrend.setText("—");
+            tvMicroSavingsTrend.setTextColor(0xFFD4A373);
+        }
 
         // Update dropdown label
         ((TextView) findViewById(R.id.tv_overview_dropdown)).setText(formatMonthYear(selectedInsightYear, selectedInsightMonth) + " ▼");
 
-        // Dynamic AI Insights
+        // Dynamic AI Insights — show rule-based immediately, then try LLM
         containerInsightsForYou.removeAllViews();
         List<String> insights = generateInsights(totalIn, totalOut, monthTxs);
         if (insights.isEmpty()) {
             insights.add("No spending data for " + formatMonthYear(selectedInsightYear, selectedInsightMonth) + ".");
         }
-        for (String insight : insights) {
-            TextView tv = new TextView(this);
-            tv.setText("• " + insight);
-            tv.setTextSize(13);
-            tv.setTextColor(0xFF000000);
-            tv.setLineSpacing(8, 1);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            lp.bottomMargin = dp(10);
-            tv.setLayoutParams(lp);
-            containerInsightsForYou.addView(tv);
-        }
+        renderInsightList(insights);
+        generateLLMInsights(totalIn, totalOut, monthTxs, allTransactions);
     }
 
     private List<String> generateInsights(double totalIn, double totalOut, List<Transaction> txs) {
@@ -527,6 +550,91 @@ public class HomeActivity extends AppCompatActivity {
         return results;
     }
 
+    private void renderInsightList(List<String> items) {
+        containerInsightsForYou.removeAllViews();
+        for (String item : items) {
+            TextView tv = new TextView(this);
+            tv.setText("• " + item);
+            tv.setTextSize(13);
+            tv.setTextColor(0xFF000000);
+            tv.setLineSpacing(8, 1);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.bottomMargin = dp(10);
+            tv.setLayoutParams(lp);
+            containerInsightsForYou.addView(tv);
+        }
+    }
+
+    private void generateLLMTrendInsight(double[] monthlyIn, double[] monthlyOut, String[] monthLabels) {
+        new Thread(() -> {
+            try {
+                JSONArray monthsJson = new JSONArray();
+                for (int i = 0; i < 6; i++) {
+                    JSONObject obj = new JSONObject();
+                    obj.put("month", monthLabels[i]);
+                    obj.put("spending", monthlyOut[i]);
+                    obj.put("income", monthlyIn[i]);
+                    monthsJson.put(obj);
+                }
+                String prompt = "You are a personal finance analyst. Analyze this 6-month trend data and write ONE concise sentence "
+                        + "(max 120 characters) that summarizes the key takeaway. Be specific with numbers when relevant.\n\n"
+                        + "Monthly data (last 6 months):\n" + monthsJson.toString(2) + "\n\n"
+                        + "Rules:\n"
+                        + "- If spending trend is declining significantly, praise the user.\n"
+                        + "- If spending is rising sharply, warn them.\n"
+                        + "- If stable, just state so with the overall figure.\n"
+                        + "- Return ONLY the sentence, no quotes, no labels.";
+                String result = GeminiClassifier.generateText(prompt);
+                if (result != null) {
+                    String trimmed = result.trim();
+                    if (!trimmed.isEmpty()) {
+                        runOnUiThread(() -> tvTrendsKeyInsight.setText(trimmed));
+                    }
+                }
+            } catch (Exception ignored) {}
+        }).start();
+    }
+
+    private void generateLLMInsights(double totalIn, double totalOut, List<Transaction> monthTxs, List<Transaction> allTxs) {
+        new Thread(() -> {
+            try {
+                JSONArray txsJson = new JSONArray();
+                for (Transaction t : monthTxs) {
+                    JSONObject obj = new JSONObject();
+                    obj.put("merchant", t.getMerchant());
+                    obj.put("amount", t.getAmount());
+                    obj.put("category", t.getCategory());
+                    obj.put("type", t.getType() == Transaction.Type.INCOMING ? "incoming" : "outgoing");
+                    obj.put("date", t.getDateDisplay());
+                    txsJson.put(obj);
+                }
+                String prompt = "You are a personal finance insights engine. Analyze this user's transaction data for the current month.\n\n"
+                        + "Total Income: $" + String.format("%.2f", totalIn) + "\n"
+                        + "Total Spending: $" + String.format("%.2f", totalOut) + "\n"
+                        + "Transactions JSON:\n" + txsJson.toString(2) + "\n\n"
+                        + "Generate exactly 3 concise bullet-point insights (no numbering, no markdown, each on its own line):\n"
+                        + "1. A warning if spending exceeds income or a category dominates (>40% of spending).\n"
+                        + "2. A tip about saving or budgeting based on the data.\n"
+                        + "3. A forecast based on recurring patterns.\n"
+                        + "If there is very little data (<3 transactions), just say 'Not enough data for AI insights.'\n"
+                        + "Be specific — use actual dollar amounts and percentages from the data.";
+                String result = GeminiClassifier.generateText(prompt);
+                if (result != null) {
+                    String[] lines = result.split("\n");
+                    List<String> insights = new ArrayList<>();
+                    for (String line : lines) {
+                        String trimmed = line.trim();
+                        if (!trimmed.isEmpty()) insights.add(trimmed);
+                    }
+                    if (!insights.isEmpty()) {
+                        runOnUiThread(() -> renderInsightList(insights));
+                    }
+                }
+            } catch (Exception ignored) {}
+        }).start();
+    }
+
     // ── SCREEN 2: SPENDING ──
 
     private void populateSpending() {
@@ -548,13 +656,18 @@ public class HomeActivity extends AppCompatActivity {
             if (t.getType() == Transaction.Type.OUTGOING) prevOut += t.getAmount();
         }
 
-        double pctChange = prevOut != 0 ? ((totalOut - prevOut) / Math.abs(prevOut)) * 100 : 0;
+        boolean hasPrevOut = prevOut != 0;
+        double pctChange = hasPrevOut ? ((totalOut - prevOut) / Math.abs(prevOut)) * 100 : 0;
 
-        tvSpendingTotal.setText("$" + String.format("%.2f", totalOut));
-        // Spending up = red, down = green
-        boolean isDown = pctChange <= 0;
-        tvSpendingTrend.setText((isDown ? "↓" : "↑") + " " + String.format("%.0f", Math.abs(pctChange)) + "% vs last month");
-        tvSpendingTrend.setTextColor(isDown ? 0xFF2B9348 : 0xFFE53935);
+        tvSpendingTotal.setText(formatCurrency(totalOut));
+        if (hasPrevOut) {
+            boolean isDown = pctChange <= 0;
+            tvSpendingTrend.setText((isDown ? "↓" : "↑") + " " + String.format("%.0f", Math.abs(pctChange)) + "% vs last month");
+            tvSpendingTrend.setTextColor(isDown ? 0xFF2B9348 : 0xFFE53935);
+        } else {
+            tvSpendingTrend.setText("New Wallet");
+            tvSpendingTrend.setTextColor(0xFFD4A373);
+        }
 
         // Daily-spending line chart from actual data
         chartSpendingLine.removeAllViews();
@@ -606,10 +719,16 @@ public class HomeActivity extends AppCompatActivity {
                 List<Integer> dataDays = new ArrayList<>(dayTotals.keySet());
                 Collections.sort(dataDays);
                 if (dataDays.size() < 2) {
-                    // Not enough points — show a flat line or placeholder
+                    textPaint.setTextAlign(Paint.Align.CENTER);
+                    float cx = w / 2f;
+                    float cy = padT + ch / 2f;
                     textPaint.setColor(0xFFD4A373);
-                    textPaint.setTextSize(28);
-                    canvas.drawText("Not enough daily data", padL + 20, padT + ch / 2f + 10, textPaint);
+                    textPaint.setTextSize(24);
+                    canvas.drawText("No spending data yet", cx, cy - 8, textPaint);
+                    textPaint.setTextSize(18);
+                    textPaint.setColor(0xFFAAAAAA);
+                    canvas.drawText("Transactions will appear here", cx, cy + 18, textPaint);
+                    textPaint.setTextAlign(Paint.Align.LEFT);
                     return;
                 }
                 float step = cw / (totalDays - 1 > 0 ? totalDays - 1 : 1);
@@ -689,21 +808,29 @@ public class HomeActivity extends AppCompatActivity {
 
             // Rounded progress bar with stadium caps
             LinearLayout barOuter = new LinearLayout(this);
-            barOuter.setLayoutParams(new LinearLayout.LayoutParams(
-                    0, dp(14), 0.35f));
-            barOuter.setBackgroundResource(R.drawable.progress_bar_bg);
+            int barHeight = dp(14);
+            LinearLayout.LayoutParams outerLp = new LinearLayout.LayoutParams(
+                    0, barHeight, 0.35f);
+            barOuter.setLayoutParams(outerLp);
+            android.graphics.drawable.GradientDrawable bgShape = new android.graphics.drawable.GradientDrawable();
+            bgShape.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+            bgShape.setCornerRadius(barHeight / 2f);
+            bgShape.setColor(0xFFF0E8D5);
+            barOuter.setBackground(bgShape);
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                barOuter.setClipToOutline(true);
+            }
 
             View barFill = new View(this);
             float fillW = (float)(pct / 100);
             barFill.setLayoutParams(new LinearLayout.LayoutParams(
                     0, LinearLayout.LayoutParams.MATCH_PARENT, fillW));
-            barFill.setBackgroundResource(R.drawable.progress_bar_fill);
-            barFill.getBackground().setTint(color);
+            barFill.setBackgroundColor(color);
             barOuter.addView(barFill);
             row.addView(barOuter);
 
             TextView tvAmt = new TextView(this);
-            tvAmt.setText("$" + String.format("%.2f", entry.getValue()));
+            tvAmt.setText(formatCurrency(entry.getValue()));
             tvAmt.setTextSize(12);
             tvAmt.setTextColor(0xFF000000);
             tvAmt.setTypeface(null, android.graphics.Typeface.BOLD);
@@ -748,19 +875,38 @@ public class HomeActivity extends AppCompatActivity {
             if (t.getType() == Transaction.Type.INCOMING) prevIn += t.getAmount();
         }
 
-        double pctChange = prevIn != 0 ? ((totalIn - prevIn) / Math.abs(prevIn)) * 100 : 0;
+        boolean hasPrevIn = prevIn != 0;
+        double pctChange = hasPrevIn ? ((totalIn - prevIn) / Math.abs(prevIn)) * 100 : 0;
 
-        tvIncomeTotal.setText("$" + String.format("%.2f", totalIn));
-        // Income up = green, down = red
-        boolean isUp = pctChange >= 0;
-        tvIncomeTrend.setText((isUp ? "↑" : "↓") + " " + String.format("%.0f", Math.abs(pctChange)) + "% vs last month");
-        tvIncomeTrend.setTextColor(isUp ? 0xFF2B9348 : 0xFFE53935);
+        tvIncomeTotal.setText(formatCurrency(totalIn));
+        if (hasPrevIn) {
+            boolean isUp = pctChange >= 0;
+            tvIncomeTrend.setText((isUp ? "↑" : "↓") + " " + String.format("%.0f", Math.abs(pctChange)) + "% vs last month");
+            tvIncomeTrend.setTextColor(isUp ? 0xFF2B9348 : 0xFFE53935);
+        } else {
+            tvIncomeTrend.setText("New Wallet");
+            tvIncomeTrend.setTextColor(0xFFD4A373);
+        }
 
-        // Wallet icon
+        // Wallet icon — white "$" on green circle
         ivIncomeWallet.setImageDrawable(null);
-        ivIncomeWallet.setBackgroundColor(0xFF38B000);
-        ivIncomeWallet.setPadding(dp(12), dp(12), dp(12), dp(12));
-        ivIncomeWallet.setBackgroundResource(R.drawable.circle_dark);
+        int walletSize = dp(48);
+        android.graphics.Bitmap walletBitmap = android.graphics.Bitmap.createBitmap(walletSize, walletSize, android.graphics.Bitmap.Config.ARGB_8888);
+        Canvas wCanvas = new Canvas(walletBitmap);
+        Paint wBg = new Paint(Paint.ANTI_ALIAS_FLAG);
+        wBg.setColor(0xFF2B9348);
+        wCanvas.drawCircle(walletSize / 2f, walletSize / 2f, walletSize / 2f, wBg);
+        Paint wText = new Paint(Paint.ANTI_ALIAS_FLAG);
+        wText.setColor(0xFFFFFFFF);
+        wText.setTextSize(walletSize * 0.5f);
+        wText.setTextAlign(Paint.Align.CENTER);
+        wText.setFakeBoldText(true);
+        float wy = -(wText.descent() + wText.ascent()) / 2f;
+        wCanvas.drawText("$", walletSize / 2f, walletSize / 2f + wy, wText);
+        ivIncomeWallet.setImageBitmap(walletBitmap);
+        ivIncomeWallet.setBackground(null);
+        ivIncomeWallet.setPadding(0, 0, 0, 0);
+        ivIncomeWallet.setLayoutParams(new LinearLayout.LayoutParams(walletSize, walletSize));
 
         // Dynamic Next Expected Income — find recurring income pattern
         List<Transaction> incomeTxs = new ArrayList<>();
@@ -813,15 +959,39 @@ public class HomeActivity extends AppCompatActivity {
         if (maxFreq > 0) {
             SimpleDateFormat sdf = new SimpleDateFormat("MMMM d, yyyy", Locale.US);
             nextDateStr = sdf.format(nextIncome.getTime());
-            countdownStr = "In " + diffDays + " day" + (diffDays != 1 ? "s" : "");
+            if (diffDays == 0) {
+                countdownStr = "Today!";
+                tvNextIncomeCountdown.setTextColor(0xFFF9A84D);
+            } else {
+                countdownStr = "In " + diffDays + " day" + (diffDays != 1 ? "s" : "");
+                tvNextIncomeCountdown.setTextColor(0xFF2B9348);
+            }
+        } else {
+            tvNextIncomeCountdown.setTextColor(0xFF2B9348);
         }
 
         tvNextIncomeCountdown.setText(countdownStr);
         tvNextIncomeDate.setText(nextDateStr);
 
-        // Calendar icon
+        // Calendar icon — white "📅" on green circle (same green as wallet)
         ivIncomeCalendar.setImageDrawable(null);
-        ivIncomeCalendar.setBackgroundResource(R.drawable.circle_green);
+        int calSize = dp(40);
+        android.graphics.Bitmap calBitmap = android.graphics.Bitmap.createBitmap(calSize, calSize, android.graphics.Bitmap.Config.ARGB_8888);
+        Canvas cCanvas = new Canvas(calBitmap);
+        Paint cBg = new Paint(Paint.ANTI_ALIAS_FLAG);
+        cBg.setColor(0xFF2B9348);
+        cCanvas.drawCircle(calSize / 2f, calSize / 2f, calSize / 2f, cBg);
+        Paint cText = new Paint(Paint.ANTI_ALIAS_FLAG);
+        cText.setColor(0xFFFFFFFF);
+        cText.setTextSize(calSize * 0.5f);
+        cText.setTextAlign(Paint.Align.CENTER);
+        cText.setFakeBoldText(true);
+        float cY = -(cText.descent() + cText.ascent()) / 2f;
+        cCanvas.drawText("📅", calSize / 2f, calSize / 2f + cY, cText);
+        ivIncomeCalendar.setImageBitmap(calBitmap);
+        ivIncomeCalendar.setBackground(null);
+        ivIncomeCalendar.setPadding(0, 0, 0, 0);
+        ivIncomeCalendar.setLayoutParams(new LinearLayout.LayoutParams(calSize, calSize));
 
         // Update dropdown
         ((TextView) findViewById(R.id.tv_income_dropdown)).setText(formatMonthYear(selectedInsightYear, selectedInsightMonth) + " ▼");
@@ -868,12 +1038,18 @@ public class HomeActivity extends AppCompatActivity {
         double recent3 = 0, prior3 = 0;
         for (int i = 3; i < 6; i++) recent3 += monthlyOut[i];
         for (int i = 0; i < 3; i++) prior3 += monthlyOut[i];
-        double pctChange = prior3 != 0 ? ((recent3 - prior3) / Math.abs(prior3)) * 100 : 0;
+        boolean hasPrior3 = prior3 != 0;
+        double pctChange = hasPrior3 ? ((recent3 - prior3) / Math.abs(prior3)) * 100 : 0;
 
-        tvTrendsTotal.setText("$" + String.format("%.2f", grandTotal));
-        boolean isDown = pctChange <= 0;
-        tvTrendsIndicator.setText((isDown ? "↓" : "↑") + " " + String.format("%.0f", Math.abs(pctChange)) + "% (last 3 vs prev 3 months)");
-        tvTrendsIndicator.setTextColor(isDown ? 0xFF2B9348 : 0xFFE53935);
+        tvTrendsTotal.setText(formatCurrency(grandTotal));
+        if (hasPrior3) {
+            boolean isDown = pctChange <= 0;
+            tvTrendsIndicator.setText((isDown ? "↓" : "↑") + " " + String.format("%.0f", Math.abs(pctChange)) + "% (last 3 vs prev 3 months)");
+            tvTrendsIndicator.setTextColor(isDown ? 0xFF2B9348 : 0xFFE53935);
+        } else {
+            tvTrendsIndicator.setText("New Wallet");
+            tvTrendsIndicator.setTextColor(0xFFD4A373);
+        }
 
         // Bar chart — spending bars (orange) + income overlay (green)
         chartTrendsBar.removeAllViews();
@@ -904,26 +1080,29 @@ public class HomeActivity extends AppCompatActivity {
                 }
                 float barW = cw / outVals.length * 0.35f;
                 float gap = cw / outVals.length;
+                float pairW = barW * 2 + 4;
                 for (int i = 0; i < outVals.length; i++) {
+                    float cx = padL + i * gap + gap / 2f;
                     // Spending bar (orange)
                     float outH = (float)(outVals[i] / maxV * ch);
-                    float ox = padL + i * gap + (gap - barW) / 2f;
+                    float ox = cx - barW - 2;
                     float oy = padT + ch - outH;
                     outPaint.setColor(0xFFF9A84D);
                     canvas.drawRoundRect(ox, oy, ox + barW, padT + ch, 6, 6, outPaint);
 
-                    // Income bar (green) — stacked behind or alongside
+                    // Income bar (green)
                     float inH = (float)(inVals[i] / maxV * ch);
-                    float ix = ox + barW + 2;
+                    float ix = cx + 2;
                     float iy = padT + ch - inH;
                     inPaint.setColor(0xFF2B9348);
                     canvas.drawRoundRect(ix, iy, ix + barW, padT + ch, 6, 6, inPaint);
 
-                    // Label
+                    // Label centered under the pair
                     textPaint.setTextSize(20);
                     textPaint.setColor(0xFFD4A373);
-                    float labelX = ox + barW - 10;
-                    canvas.drawText(monthLabels[i], labelX, h - 4, textPaint);
+                    textPaint.setTextAlign(Paint.Align.CENTER);
+                    canvas.drawText(monthLabels[i], cx, h - 4, textPaint);
+                    textPaint.setTextAlign(Paint.Align.LEFT);
                 }
                 // Legend
                 textPaint.setTextSize(22);
@@ -938,27 +1117,39 @@ public class HomeActivity extends AppCompatActivity {
                 FrameLayout.LayoutParams.MATCH_PARENT, dp(140)));
         chartTrendsBar.addView(barView);
 
-        // Dynamic AI summary
-        double maxOutMonth = 0, minOutMonth = Double.MAX_VALUE;
-        int maxIdx = 0, minIdx = 0;
+        // Dynamic AI summary — rule-based immediately, then LLM
+        double maxOutMonth = 0;
+        int maxIdx = 0;
+        int nonZeroMonths = 0;
         for (int i = 0; i < 6; i++) {
             if (monthlyOut[i] > maxOutMonth) { maxOutMonth = monthlyOut[i]; maxIdx = i; }
-            if (monthlyOut[i] < minOutMonth) { minOutMonth = monthlyOut[i]; minIdx = i; }
+            if (monthlyOut[i] > 0) nonZeroMonths++;
         }
         String summary;
-        if (pctChange < -10) {
+        if (nonZeroMonths == 0) {
+            summary = "No spending data available for the last 6 months.";
+        } else if (nonZeroMonths == 1) {
+            summary = "Your only spending this period was in " + monthLabels[maxIdx]
+                    + " (" + formatCurrency(maxOutMonth) + "). No comparison data available.";
+        } else if (pctChange < -10 && hasPrior3) {
             summary = "Your spending has decreased significantly (" + String.format("%.0f", Math.abs(pctChange))
                     + "%) compared to the prior period. Great job keeping expenses under control!";
-        } else if (pctChange > 10) {
+        } else if (pctChange > 10 && hasPrior3) {
             summary = "Your spending has increased " + String.format("%.0f", pctChange)
                     + "% vs the prior period. Review " + monthLabels[maxIdx] + " for the highest spending ("
-                    + "$" + String.format("%.0f", maxOutMonth) + ").";
-        } else {
+                    + formatCurrency(maxOutMonth) + ").";
+        } else if (hasPrior3) {
             summary = "Your spending has been relatively stable over the last 6 months ("
                     + (pctChange >= 0 ? "+" : "") + String.format("%.0f", pctChange)
                     + "% vs prior period). Consistent budgeting habits!";
+        } else {
+            summary = "Your highest spending was in " + monthLabels[maxIdx]
+                    + " (" + formatCurrency(maxOutMonth) + ").";
         }
-        tvTrendsKeyInsight.setText(summary);
+        String finalSummary = summary;
+        tvTrendsKeyInsight.setText(finalSummary);
+        // Try LLM for a smarter insight
+        generateLLMTrendInsight(monthlyIn, monthlyOut, monthLabels);
     }
 
     // ── GEMINI BATCH CLASSIFICATION ──

@@ -121,6 +121,35 @@ public class GeminiClassifier {
         return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ").replace("\r", "");
     }
 
+    /**
+     * Generic text generation. Sends an arbitrary prompt and returns the plain-text response.
+     * Returns null on any failure.
+     */
+    public static String generateText(String prompt) {
+        if (apiKey == null || apiKey.isEmpty()) return null;
+        try {
+            String requestJson = buildRequest(prompt);
+            String responseJson = postJson(API_URL + apiKey, requestJson);
+            if (responseJson == null) return null;
+            // Extract text from response
+            JSONObject root = new JSONObject(responseJson);
+            JSONArray candidates = root.optJSONArray("candidates");
+            if (candidates != null && candidates.length() > 0) {
+                JSONObject content = candidates.getJSONObject(0).optJSONObject("content");
+                if (content != null) {
+                    JSONArray parts = content.optJSONArray("parts");
+                    if (parts != null && parts.length() > 0) {
+                        return parts.getJSONObject(0).optString("text", null);
+                    }
+                }
+            }
+            return null;
+        } catch (Exception e) {
+            Log.e(TAG, "Gemini generateText failed", e);
+            return null;
+        }
+    }
+
     // ── Request / Response ────────────────────────────────────────────────────
 
     private static String buildRequest(String promptText) throws Exception {
