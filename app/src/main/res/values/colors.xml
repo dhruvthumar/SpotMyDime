@@ -25,4 +25,17 @@
     <color name="nav_active_bg">#F9AC54</color>
     <color name="nav_inactive_icon">#F9AC54</color>
     <color name="nav_inactive_border">#F9AC54</color>
+
+    <!-- New Design System Colors -->
+    <color name="pale_cream">#FCF8F2</color>
+    <color name="soft_orange">#F9A84D</color>
+    <color name="muted_orange_brown">#D4A373</color>
+    <color name="positive_green">#2B9348</color>
+    <color name="green_pill_light">#95F095</color>
+    <color name="coral_red">#F9575C</color>
+    <color name="deep_teal">#2A9D8F</color>
+    <color name="maroon">#8D0801</color>
+    <color name="bright_green">#38B000</color>
+    <color name="chart_green">#52B788</color>
+    <color name="dusty_rose">#D4A373</color>
 </resources>

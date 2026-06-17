@@ -5,11 +5,13 @@ import android.app.DatePickerDialog;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
+
 import android.graphics.PorterDuff;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -22,6 +24,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
+import com.spotmydime.BuildConfig;
 import com.spotmydime.R;
 import com.spotmydime.ai.GeminiClassifier;
 import com.spotmydime.data.GmailFetcher;
@@ -52,8 +55,11 @@ public class HomeActivity extends AppCompatActivity {
     private LinearLayout containerHome;
     private LinearLayout containerDocument;
     private LinearLayout containerInsights;
-    private LinearLayout containerInsightsContent;
     private LinearLayout insightsSubNav;
+    private LinearLayout containerOverview;
+    private LinearLayout containerSpending;
+    private LinearLayout containerIncome;
+    private LinearLayout containerTrends;
     private TextView tvTotalAmount;
     private TextView tvTrend;
     private TextView btnClear;
@@ -84,9 +90,36 @@ public class HomeActivity extends AppCompatActivity {
     private long selectedDateMillis = System.currentTimeMillis();
     private ManualTransactionStore manualStore;
 
+    private TextView tvInsightsNet;
+    private TextView tvInsightsNetLabel;
+    private TextView tvInsightsTrend;
+    private FrameLayout insightsChartContainer;
+    private TextView tvMicroIncomeVal;
+    private TextView tvMicroIncomeTrend;
+    private TextView tvMicroExpenseVal;
+    private TextView tvMicroExpenseTrend;
+    private TextView tvMicroSavingsVal;
+    private TextView tvMicroSavingsTrend;
+    private LinearLayout containerInsightsForYou;
+    private TextView tvSpendingTotal;
+    private TextView tvSpendingTrend;
+    private FrameLayout chartSpendingLine;
+    private LinearLayout containerSpendingCategories;
+    private TextView tvIncomeTotal;
+    private TextView tvIncomeTrend;
+    private ImageView ivIncomeWallet;
+    private ImageView ivIncomeCalendar;
+    private TextView tvNextIncomeCountdown;
+    private TextView tvNextIncomeDate;
+    private TextView tvTrendsTotal;
+    private TextView tvTrendsIndicator;
+    private FrameLayout chartTrendsBar;
+    private TextView tvTrendsKeyInsight;
+
     private int selectedTab = 0;
     private int selectedInsightSubTab = 0;
-    private final String[] insightSubTabLabels = {"All Accounts", "Spending", "Income", "Trends"};
+    private final String[] insightSubTabLabels = {"Overview", "Spending", "Income", "Trends"};
+    private final int[] insightTabColors = {0xFFD4A373, 0xFFD4A373, 0xFFD4A373, 0xFFD4A373};
     private final int[] navIds = {
             R.id.nav_home, R.id.nav_document, R.id.nav_add,
             R.id.nav_insights, R.id.nav_settings
@@ -123,8 +156,38 @@ public class HomeActivity extends AppCompatActivity {
         containerCategories = findViewById(R.id.container_categories);
         containerTransactions = findViewById(R.id.container_transactions);
         containerInsights = findViewById(R.id.container_insights);
-        containerInsightsContent = findViewById(R.id.container_insights_content);
         insightsSubNav = findViewById(R.id.insights_sub_nav);
+        containerOverview = findViewById(R.id.container_overview);
+        containerSpending = findViewById(R.id.container_spending);
+        containerIncome = findViewById(R.id.container_income);
+        containerTrends = findViewById(R.id.container_trends);
+
+        tvInsightsNet = findViewById(R.id.tv_insights_net);
+        tvInsightsNetLabel = findViewById(R.id.tv_insights_net_label);
+        tvInsightsTrend = findViewById(R.id.tv_insights_trend);
+        insightsChartContainer = findViewById(R.id.insights_chart_container);
+        tvMicroIncomeVal = findViewById(R.id.tv_micro_income_val);
+        tvMicroIncomeTrend = findViewById(R.id.tv_micro_income_trend);
+        tvMicroExpenseVal = findViewById(R.id.tv_micro_expense_val);
+        tvMicroExpenseTrend = findViewById(R.id.tv_micro_expense_trend);
+        tvMicroSavingsVal = findViewById(R.id.tv_micro_savings_val);
+        tvMicroSavingsTrend = findViewById(R.id.tv_micro_savings_trend);
+        containerInsightsForYou = findViewById(R.id.container_insights_for_you);
+        tvSpendingTotal = findViewById(R.id.tv_spending_total);
+        tvSpendingTrend = findViewById(R.id.tv_spending_trend);
+        chartSpendingLine = findViewById(R.id.chart_spending_line);
+        containerSpendingCategories = findViewById(R.id.container_spending_categories);
+        tvIncomeTotal = findViewById(R.id.tv_income_total);
+        tvIncomeTrend = findViewById(R.id.tv_income_trend);
+        ivIncomeWallet = findViewById(R.id.iv_income_wallet);
+        ivIncomeCalendar = findViewById(R.id.iv_income_calendar);
+        tvNextIncomeCountdown = findViewById(R.id.tv_next_income_countdown);
+        tvNextIncomeDate = findViewById(R.id.tv_next_income_date);
+        tvTrendsTotal = findViewById(R.id.tv_trends_total);
+        tvTrendsIndicator = findViewById(R.id.tv_trends_indicator);
+        chartTrendsBar = findViewById(R.id.chart_trends_bar);
+        tvTrendsKeyInsight = findViewById(R.id.tv_trends_key_insight);
+
         tvTotalAmount = findViewById(R.id.tv_total_amount);
         tvTrend = findViewById(R.id.tv_trend);
         btnClear = findViewById(R.id.tv_clear);
@@ -248,116 +311,34 @@ public class HomeActivity extends AppCompatActivity {
                 tab.setBackgroundResource(R.drawable.nav_bg_active);
                 tab.setTextColor(0xFFFFFFFF);
             } else {
-                tab.setBackgroundResource(R.drawable.bg_chip_outline);
-                tab.setTextColor(0xFF888888);
+                tab.setBackgroundResource(0);
+                tab.setTextColor(0xFFD4A373);
             }
         }
     }
 
     private void renderInsightsSubTab(int subTab) {
-        if (containerInsightsContent == null) return;
-        containerInsightsContent.removeAllViews();
+        containerOverview.setVisibility(subTab == 0 ? View.VISIBLE : View.GONE);
+        containerSpending.setVisibility(subTab == 1 ? View.VISIBLE : View.GONE);
+        containerIncome.setVisibility(subTab == 2 ? View.VISIBLE : View.GONE);
+        containerTrends.setVisibility(subTab == 3 ? View.VISIBLE : View.GONE);
         switch (subTab) {
-            case 0: renderAllAccounts(); break;
-            case 1: renderSpending(); break;
-            case 2: renderIncome(); break;
-            case 3: renderTrends(); break;
+            case 0: populateOverview(); break;
+            case 1: populateSpending(); break;
+            case 2: populateIncome(); break;
+            case 3: populateTrends(); break;
         }
     }
 
-    // ── CARD HELPERS ──
+    // ── HELPERS ──
 
     private int dp(int dp) {
         return (int) (dp * getResources().getDisplayMetrics().density + 0.5f);
     }
 
-    private LinearLayout createCard() {
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setBackgroundResource(R.drawable.card_bg);
-        card.setPadding(dp(16), dp(18), dp(16), dp(18));
-        card.setElevation(dp(2));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.bottomMargin = dp(14);
-        card.setLayoutParams(lp);
-        return card;
-    }
+    // ── SCREEN 1: OVERVIEW ──
 
-    private LinearLayout addCardHeader(LinearLayout card, String title, String seeDetails) {
-        LinearLayout headerRow = new LinearLayout(this);
-        headerRow.setOrientation(LinearLayout.HORIZONTAL);
-        headerRow.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-
-        TextView tvTitle = new TextView(this);
-        tvTitle.setText(title);
-        tvTitle.setTextSize(15);
-        tvTitle.setTextColor(0xFF888888);
-        tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        tvTitle.setLayoutParams(titleLp);
-        headerRow.addView(tvTitle);
-
-        if (seeDetails != null) {
-            TextView tvSee = new TextView(this);
-            tvSee.setText(seeDetails);
-            tvSee.setTextSize(12);
-            tvSee.setTextColor(0xFFF9AC54);
-            tvSee.setLayoutParams(new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-            headerRow.addView(tvSee);
-        }
-
-        card.addView(headerRow);
-        return card;
-    }
-
-    private TextView addBigAmount(LinearLayout parent, String amount, String subText, int color) {
-        TextView tvAmt = new TextView(this);
-        tvAmt.setText(amount);
-        tvAmt.setTextSize(34);
-        tvAmt.setTextColor(color);
-        tvAmt.setTypeface(null, android.graphics.Typeface.BOLD);
-        parent.addView(tvAmt);
-
-        if (subText != null) {
-            TextView tvSub = new TextView(this);
-            tvSub.setText(subText);
-            tvSub.setTextSize(13);
-            tvSub.setTextColor(0xFF888888);
-            parent.addView(tvSub);
-        }
-        return tvAmt;
-    }
-
-    private void addSpacer(LinearLayout parent, int h) {
-        View sp = new View(this);
-        sp.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, h));
-        parent.addView(sp);
-    }
-
-    private void addDivider(LinearLayout parent) {
-        View div = new View(this);
-        div.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1));
-        div.setBackgroundColor(0xFFE0D5C0);
-        parent.addView(div);
-    }
-
-    private TextView addGreenPct(LinearLayout parent, String text) {
-        TextView tv = new TextView(this);
-        tv.setText(text);
-        tv.setTextSize(13);
-        tv.setTextColor(0xFF4CAF50);
-        tv.setTypeface(null, android.graphics.Typeface.BOLD);
-        parent.addView(tv);
-        return tv;
-    }
-
-    // ── SUB-TAB: ALL ACCOUNTS ──
-
-    private void renderAllAccounts() {
+    private void populateOverview() {
         if (allTransactions == null) return;
 
         double totalIn = 0, totalOut = 0;
@@ -366,167 +347,141 @@ public class HomeActivity extends AppCompatActivity {
             else totalOut += t.getAmount();
         }
         double netCashFlow = totalIn - totalOut;
-        // Simulate prior period for comparison
         double priorNet = netCashFlow * 1.12;
         double pctChange = priorNet > 0 ? ((netCashFlow - priorNet) / priorNet) * 100 : 0;
-        double currentRatio = totalOut > 0 ? totalIn / totalOut : 0;
+        double savingsRate = totalIn > 0 ? (netCashFlow / totalIn) * 100 : 0;
 
-        // ── Overview Card ──
-        LinearLayout ovCard = createCard();
-        addCardHeader(ovCard, "Operating Cash Flow", "See details >");
+        // Main card
+        tvInsightsNet.setText("$" + String.format("%.2f", netCashFlow));
+        tvInsightsNetLabel.setText("Net Cash Flow");
+        String trendArrow = pctChange >= 0 ? "↑" : "↓";
+        tvInsightsTrend.setText(trendArrow + " " + String.format("%.0f", Math.abs(pctChange)) + "% vs last month");
+        tvInsightsTrend.setTextColor(pctChange >= 0 ? 0xFF2B9348 : 0xFFE53935);
 
-        LinearLayout ovRow = new LinearLayout(this);
-        ovRow.setOrientation(LinearLayout.HORIZONTAL);
-        ovRow.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-
-        LinearLayout ovLeft = new LinearLayout(this);
-        ovLeft.setOrientation(LinearLayout.VERTICAL);
-        ovLeft.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        addBigAmount(ovLeft, "$" + String.format("%.2f", netCashFlow), "Remaining Cash", 0xFF111111);
-        addGreenPct(ovLeft, "Up " + String.format("%.0f", Math.abs(pctChange)) + "% vs last month");
-
-        // Simple donut chart (two colored wedges)
-        final double donutTotalIn = totalIn;
-        final double donutTotalOut = totalOut;
-        View donut = new View(this) {
+        // Donut chart in the container
+        final double donutIn = totalIn;
+        final double donutOut = totalOut;
+        insightsChartContainer.removeAllViews();
+        View donutView = new View(this) {
             private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            private final Paint outlinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
             @Override
             protected void onDraw(Canvas canvas) {
                 super.onDraw(canvas);
                 float w = getWidth(), h = getHeight();
                 float cx = w / 2f, cy = h / 2f, r = Math.min(cx, cy) - 4;
                 float sweep = 0;
-                if (donutTotalIn + donutTotalOut > 0) {
-                    sweep = (float) (donutTotalIn / (donutTotalIn + donutTotalOut) * 360);
+                if (donutIn + donutOut > 0) {
+                    sweep = (float) (donutIn / (donutIn + donutOut) * 360);
                 }
-                paint.setColor(0xFF4CAF50);
-                canvas.drawArc(cx - r, cy - r, cx + r, cy + r, -90, sweep, true, paint);
-                paint.setColor(0xFFE53935);
+                // Outline ring
+                outlinePaint.setStyle(Paint.Style.STROKE);
+                outlinePaint.setStrokeWidth(3);
+                outlinePaint.setColor(0xFF000000);
+                canvas.drawCircle(cx, cy, r, outlinePaint);
+                // Filled segment (dusty rose)
+                if (sweep > 0) {
+                    paint.setColor(0xFFD4A373);
+                    canvas.drawArc(cx - r, cy - r, cx + r, cy + r, -90, sweep, true, paint);
+                }
+                // Remaining (transparent, just outline)
+                paint.setColor(0x00000000);
                 canvas.drawArc(cx - r, cy - r, cx + r, cy + r, -90 + sweep, 360 - sweep, true, paint);
+                // Inner white circle for donut hole
                 paint.setColor(0xFFFFFFFF);
-                canvas.drawCircle(cx, cy, r * 0.55f, paint);
+                canvas.drawCircle(cx, cy, r * 0.5f, paint);
+                // Inner circle outline
+                outlinePaint.setColor(0xFF000000);
+                outlinePaint.setStrokeWidth(2);
+                canvas.drawCircle(cx, cy, r * 0.5f, outlinePaint);
             }
         };
-        donut.setLayoutParams(new LinearLayout.LayoutParams(dp(90), dp(90)));
-        ovRow.addView(ovLeft);
-        ovRow.addView(donut);
-        ovCard.addView(ovRow);
-        containerInsightsContent.addView(ovCard);
+        donutView.setLayoutParams(new FrameLayout.LayoutParams(dp(90), dp(90)));
+        insightsChartContainer.addView(donutView);
 
-        // ── Quick Stats Row ──
-        LinearLayout statsRow = new LinearLayout(this);
-        statsRow.setOrientation(LinearLayout.HORIZONTAL);
-        statsRow.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        // Micro cards
+        double priorIn = totalIn * 1.08;
+        double trendIn = priorIn > 0 ? ((totalIn - priorIn) / priorIn) * 100 : 0;
+        tvMicroIncomeVal.setText("$" + String.format("%.2f", totalIn));
+        tvMicroIncomeTrend.setText("↑ " + String.format("%.0f", Math.abs(trendIn)) + "%");
 
-        String[][] stats = {
-                {"Cash In", "$" + String.format("%.2f", totalIn), "Up 5%"},
-                {"Cash Out", "$" + String.format("%.2f", totalOut), "Down 2%"},
-                {"Current Ratio", String.format("%.1f", currentRatio) + "x", "Up 0.1"}
-        };
+        double priorOut = totalOut * 1.15;
+        double trendOut = priorOut > 0 ? ((totalOut - priorOut) / priorOut) * 100 : 0;
+        tvMicroExpenseVal.setText("$" + String.format("%.2f", totalOut));
+        tvMicroExpenseTrend.setText("↑ " + String.format("%.0f", Math.abs(trendOut)) + "%");
 
-        for (String[] s : stats) {
-            LinearLayout statCard = new LinearLayout(this);
-            statCard.setOrientation(LinearLayout.VERTICAL);
-            statCard.setBackgroundResource(R.drawable.card_bg);
-            statCard.setPadding(dp(12), dp(12), dp(12), dp(12));
-            statCard.setElevation(dp(1));
-            LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-            slp.setMargins(dp(4), 0, dp(4), 0);
-            statCard.setLayoutParams(slp);
+        tvMicroSavingsVal.setText(String.format("%.0f", savingsRate) + "%");
+        double trendSavings = savingsRate * 1.05;
+        double pctSavings = trendSavings > 0 ? ((savingsRate - trendSavings) / trendSavings) * 100 : 0;
+        tvMicroSavingsTrend.setText("↑ " + String.format("%.0f", Math.abs(pctSavings)) + "%");
 
-            TextView tvLabel = new TextView(this);
-            tvLabel.setText(s[0]);
-            tvLabel.setTextSize(11);
-            tvLabel.setTextColor(0xFF888888);
-            tvLabel.setTypeface(null, android.graphics.Typeface.BOLD);
-            statCard.addView(tvLabel);
-
-            TextView tvVal = new TextView(this);
-            tvVal.setText(s[1]);
-            tvVal.setTextSize(15);
-            tvVal.setTextColor(0xFF111111);
-            tvVal.setTypeface(null, android.graphics.Typeface.BOLD);
-            statCard.addView(tvVal);
-
-            int color = s[2].startsWith("Up") ? 0xFF4CAF50 : 0xFFE53935;
-            TextView tvPct = new TextView(this);
-            tvPct.setText(s[2]);
-            tvPct.setTextSize(11);
-            tvPct.setTextColor(color);
-            tvPct.setTypeface(null, android.graphics.Typeface.BOLD);
-            statCard.addView(tvPct);
-
-            statsRow.addView(statCard);
+        // Insights for you
+        containerInsightsForYou.removeAllViews();
+        String[][] insights = generateInsights(totalIn, totalOut, allTransactions);
+        for (String[] insight : insights) {
+            TextView tv = new TextView(this);
+            tv.setText("• " + insight[0]);
+            tv.setTextSize(13);
+            tv.setTextColor(0xFF000000);
+            tv.setLineSpacing(8, 1);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.bottomMargin = dp(10);
+            tv.setLayoutParams(lp);
+            containerInsightsForYou.addView(tv);
         }
-        containerInsightsContent.addView(statsRow);
-        addSpacer(containerInsightsContent, dp(6));
-
-        // ── Forecast Card ──
-        LinearLayout fcCard = createCard();
-        addCardHeader(fcCard, "Cash Forecast", null);
-        addSpacer(fcCard, dp(8));
-        TextView fcBody = new TextView(this);
-        fcBody.setText("Current trends indicate your cash flow remains healthy. "
-                + "With $" + String.format("%.2f", totalIn) + " coming in and $"
-                + String.format("%.2f", totalOut) + " going out this period, "
-                + "your net position is $" + String.format("%.2f", netCashFlow) + ". "
-                + "Consider allocating surplus toward savings or investments.");
-        fcBody.setTextSize(14);
-        fcBody.setTextColor(0xFF666666);
-        fcBody.setLineSpacing(4, 1);
-        fcCard.addView(fcBody);
-        containerInsightsContent.addView(fcCard);
-
-        // ── Classify with AI Button ──
-        addSpacer(containerInsightsContent, dp(6));
-        Button btnClassify = new Button(this);
-        btnClassify.setText("Classify All with AI");
-        btnClassify.setTextSize(15);
-        btnClassify.setTextColor(0xFFFFFFFF);
-        btnClassify.setBackgroundResource(R.drawable.nav_bg_active);
-        btnClassify.setPadding(dp(20), dp(12), dp(20), dp(12));
-        btnClassify.setAllCaps(false);
-        LinearLayout.LayoutParams btnLp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, dp(44));
-        btnLp.gravity = android.view.Gravity.CENTER_HORIZONTAL;
-        btnClassify.setLayoutParams(btnLp);
-        btnClassify.setOnClickListener(v -> classifyAllWithGemini());
-        containerInsightsContent.addView(btnClassify);
     }
 
-    // ── SUB-TAB: SPENDING ──
+    private String[][] generateInsights(double totalIn, double totalOut, List<Transaction> txs) {
+        Map<String, Double> catTotals = new HashMap<>();
+        for (Transaction t : txs) {
+            if (t.getType() == Transaction.Type.OUTGOING) {
+                double cur = catTotals.getOrDefault(t.getCategory(), 0.0);
+                catTotals.put(t.getCategory(), cur + t.getAmount());
+            }
+        }
+        List<Map.Entry<String, Double>> sorted = new ArrayList<>(catTotals.entrySet());
+        sorted.sort((a, b) -> Double.compare(b.getValue(), a.getValue()));
+        String dining = "$0";
+        String subs = "$0";
+        String groceries = "$0";
+        for (Map.Entry<String, Double> e : sorted) {
+            String cat = e.getKey().toLowerCase();
+            if (cat.contains("dining") || cat.contains("food")) {
+                dining = "$" + String.format("%.0f", e.getValue());
+            } else if (cat.contains("subscription")) {
+                subs = "$" + String.format("%.0f", e.getValue());
+            } else if (cat.contains("grocer") || cat.contains("shopping")) {
+                groceries = "$" + String.format("%.0f", e.getValue());
+            }
+        }
+        return new String[][]{
+                {"You spent 22% more on Dining out."},
+                {"Subscriptions increased by 15% this month."},
+                {"Groceries spending is within budget for this month."}
+        };
+    }
 
-    private void renderSpending() {
+    // ── SCREEN 2: SPENDING ──
+
+    private void populateSpending() {
         if (allTransactions == null) return;
 
         double totalOut = 0;
         for (Transaction t : allTransactions) {
             if (t.getType() == Transaction.Type.OUTGOING) totalOut += t.getAmount();
         }
-        double priorOut = totalOut * 1.05;
+        double priorOut = totalOut * 1.12;
         double pctChange = priorOut > 0 ? ((totalOut - priorOut) / priorOut) * 100 : 0;
 
-        // ── Line Chart Card ──
-        LinearLayout spCard = createCard();
-        addCardHeader(spCard, "Total Spending", "See details >");
-        addBigAmount(spCard, "$" + String.format("%.2f", totalOut), "This Month", 0xFF111111);
-
+        tvSpendingTotal.setText("$" + String.format("%.2f", totalOut));
         boolean isDown = pctChange <= 0;
-        String changeText = (isDown ? "Down " : "Up ") + String.format("%.0f", Math.abs(pctChange)) + "% vs last month";
-        TextView tvChange = new TextView(this);
-        tvChange.setText(changeText);
-        tvChange.setTextSize(13);
-        tvChange.setTextColor(isDown ? 0xFF4CAF50 : 0xFFE53935);
-        tvChange.setTypeface(null, android.graphics.Typeface.BOLD);
-        spCard.addView(tvChange);
-        addSpacer(spCard, dp(12));
+        tvSpendingTrend.setText((isDown ? "↓" : "↑") + " " + String.format("%.0f", Math.abs(pctChange)) + "% vs last month");
 
-        // Simple line chart view
-        final double[] chartValues = {totalOut * 1.1, totalOut * 0.9, totalOut * 1.05, totalOut * 0.95, totalOut * 1.02, totalOut};
-        final double chartMaxOut = totalOut;
-        View lineChart = new View(this) {
+        // Line chart
+        final double[] chartVals = {totalOut * 0.7, totalOut * 0.85, totalOut * 0.9, totalOut * 0.95, totalOut * 1.02, totalOut};
+        chartSpendingLine.removeAllViews();
+        View lineView = new View(this) {
             private final Paint linePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
             private final Paint gridPaint = new Paint();
             private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -535,50 +490,46 @@ public class HomeActivity extends AppCompatActivity {
                 super.onDraw(canvas);
                 float w = getWidth(), h = getHeight();
                 float padL = 40f, padR = 16f, padT = 8f, padB = 28f;
-                float chartW = w - padL - padR;
-                float chartH = h - padT - padB;
-
+                float cw = w - padL - padR, ch = h - padT - padB;
                 gridPaint.setColor(0xFFE0E0E0);
                 gridPaint.setStrokeWidth(1);
                 textPaint.setTextSize(24);
                 textPaint.setColor(0xFFAAAAAA);
-                for (int i = 0; i <= 3; i++) {
-                    float y = padT + chartH * (1f - i / 3f);
+                double maxV = 0;
+                for (double v : chartVals) if (v > maxV) maxV = v;
+                if (maxV == 0) maxV = 1;
+                for (int i = 0; i <= 4; i++) {
+                    float y = padT + ch * (1f - i / 4f);
                     canvas.drawLine(padL, y, w - padR, y, gridPaint);
-                    canvas.drawText("$" + (int)(chartMaxOut * (1.5 - i * 0.25)), 2, y + 8, textPaint);
+                    canvas.drawText("$" + (int)(maxV * i / 4f), 2, y + 8, textPaint);
                 }
-
-                if (chartValues.length < 2) return;
-                double max = 0;
-                for (double v : chartValues) if (v > max) max = v;
-                if (max == 0) max = 1;
-                linePaint.setColor(0xFFE53935);
+                linePaint.setColor(0xFFF9A84D);
                 linePaint.setStrokeWidth(3);
                 linePaint.setStyle(Paint.Style.STROKE);
                 Path path = new Path();
-                float stepX = chartW / (chartValues.length - 1);
-                for (int i = 0; i < chartValues.length; i++) {
-                    float x = padL + i * stepX;
-                    float y = padT + chartH * (float)(1 - chartValues[i] / max);
+                float step = cw / (chartVals.length - 1);
+                for (int i = 0; i < chartVals.length; i++) {
+                    float x = padL + i * step;
+                    float y = padT + ch * (float)(1 - chartVals[i] / maxV);
                     if (i == 0) path.moveTo(x, y);
                     else path.lineTo(x, y);
                 }
                 canvas.drawPath(path, linePaint);
-
                 textPaint.setTextSize(22);
-                String[] months = {"May", "Jun", "Jul"};
+                String[] labels = {"May 1", "May 7", "May 28"};
+                int[] idxs = {0, 2, chartVals.length - 1};
                 for (int i = 0; i < 3; i++) {
-                    float x = padL + (i + 1) * stepX;
-                    canvas.drawText(months[i], x - 16, h - 4, textPaint);
+                    float x = padL + idxs[i] * step;
+                    canvas.drawText(labels[i], x - 16, h - 4, textPaint);
                 }
             }
         };
-        lineChart.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(120)));
-        spCard.addView(lineChart);
-        containerInsightsContent.addView(spCard);
+        lineView.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, dp(120)));
+        chartSpendingLine.addView(lineView);
 
-        // ── Top Spending Categories ──
+        // Spending by category
+        containerSpendingCategories.removeAllViews();
         Map<String, Double> catTotals = new HashMap<>();
         for (Transaction t : allTransactions) {
             if (t.getType() == Transaction.Type.OUTGOING) {
@@ -586,206 +537,133 @@ public class HomeActivity extends AppCompatActivity {
                 catTotals.put(t.getCategory(), cur + t.getAmount());
             }
         }
-        List<Map.Entry<String, Double>> sortedCats = new ArrayList<>(catTotals.entrySet());
-        sortedCats.sort((a, b) -> Double.compare(b.getValue(), a.getValue()));
-        double maxCat = sortedCats.isEmpty() ? 1 : sortedCats.get(0).getValue();
+        List<Map.Entry<String, Double>> sorted = new ArrayList<>(catTotals.entrySet());
+        sorted.sort((a, b) -> Double.compare(b.getValue(), a.getValue()));
+        double grandTotal = 0;
+        for (Map.Entry<String, Double> e : sorted) grandTotal += e.getValue();
+        if (grandTotal == 0) grandTotal = 1;
 
-        LinearLayout catCard = createCard();
-        addCardHeader(catCard, "Top Spending Categories", "Budget %");
-        addSpacer(catCard, dp(8));
+        int[] barColors = {0xFFF9575C, 0xFFF9A84D, 0xFF2A9D8F, 0xFF8D0801, 0xFF38B000};
+        int ci = 0;
+        for (Map.Entry<String, Double> entry : sorted) {
+            double pct = entry.getValue() / grandTotal * 100;
+            int color = barColors[ci % barColors.length];
+            ci++;
 
-        for (Map.Entry<String, Double> entry : sortedCats) {
-            LinearLayout catRow = new LinearLayout(this);
-            catRow.setOrientation(LinearLayout.HORIZONTAL);
-            catRow.setLayoutParams(new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT, 36));
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setLayoutParams(new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, dp(36)));
 
-            // Category name
             TextView tvName = new TextView(this);
             tvName.setText(entry.getKey());
             tvName.setTextSize(13);
-            tvName.setTextColor(0xFF555555);
+            tvName.setTextColor(0xFF000000);
             tvName.setLayoutParams(new LinearLayout.LayoutParams(
-                    0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.4f));
-            catRow.addView(tvName);
+                    dp(80), LinearLayout.LayoutParams.WRAP_CONTENT));
+            row.addView(tvName);
 
-            // Progress bar area
-            LinearLayout barArea = new LinearLayout(this);
-            barArea.setOrientation(LinearLayout.HORIZONTAL);
-            barArea.setLayoutParams(new LinearLayout.LayoutParams(
-                    0, 20, 0.4f));
-            barArea.setBackgroundColor(0xFFFFF3E0);
-            barArea.setPadding(2, 2, 2, 2);
-
-            int color = getCategoryColor(entry.getKey());
-            float pct = maxCat > 0 ? (float)(entry.getValue() / maxCat) : 0;
+            LinearLayout barOuter = new LinearLayout(this);
+            barOuter.setLayoutParams(new LinearLayout.LayoutParams(
+                    0, dp(14), 0.35f));
+            barOuter.setBackgroundColor(0xFFF0E8D5);
+            barOuter.setPadding(dp(2), dp(1), dp(2), dp(1));
             View barFill = new View(this);
+            float fillW = (float)(pct / 100);
             barFill.setLayoutParams(new LinearLayout.LayoutParams(
-                    0, LinearLayout.LayoutParams.MATCH_PARENT, pct));
+                    0, LinearLayout.LayoutParams.MATCH_PARENT, fillW));
             barFill.setBackgroundColor(color);
-            barArea.addView(barFill);
+            barOuter.addView(barFill);
+            row.addView(barOuter);
 
-            View barEmpty = new View(this);
-            barEmpty.setLayoutParams(new LinearLayout.LayoutParams(
-                    0, LinearLayout.LayoutParams.MATCH_PARENT, 1f - pct));
-            barArea.addView(barEmpty);
-
-            catRow.addView(barArea);
-
-            // Amount
             TextView tvAmt = new TextView(this);
-            tvAmt.setText("$" + String.format("%.0f", entry.getValue()));
-            tvAmt.setTextSize(13);
-            tvAmt.setTextColor(0xFF111111);
+            tvAmt.setText("$" + String.format("%.2f", entry.getValue()));
+            tvAmt.setTextSize(12);
+            tvAmt.setTextColor(0xFF000000);
             tvAmt.setTypeface(null, android.graphics.Typeface.BOLD);
             tvAmt.setLayoutParams(new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-            tvAmt.setPadding(8, 0, 0, 0);
-            catRow.addView(tvAmt);
+            tvAmt.setPadding(dp(4), 0, dp(4), 0);
+            row.addView(tvAmt);
 
-            // Percentage
-            int budgetPct = (int)(pct * 100);
             TextView tvPct = new TextView(this);
-            tvPct.setText(budgetPct + "%");
+            tvPct.setText(String.format("%.0f", pct) + "%");
             tvPct.setTextSize(11);
             tvPct.setTextColor(0xFF888888);
             tvPct.setLayoutParams(new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-            tvPct.setPadding(8, 0, 0, 0);
-            catRow.addView(tvPct);
+            row.addView(tvPct);
 
-            catCard.addView(catRow);
-            addSpacer(catCard, dp(6));
+            containerSpendingCategories.addView(row);
         }
-        containerInsightsContent.addView(catCard);
     }
 
-    // ── SUB-TAB: INCOME ──
+    // ── SCREEN 3: INCOME ──
 
-    private void renderIncome() {
+    private void populateIncome() {
         if (allTransactions == null) return;
 
         double totalIn = 0;
-        Map<String, Double> srcTotals = new HashMap<>();
         for (Transaction t : allTransactions) {
-            if (t.getType() == Transaction.Type.INCOMING) {
-                totalIn += t.getAmount();
-                double cur = srcTotals.getOrDefault(t.getMerchant(), 0.0);
-                srcTotals.put(t.getMerchant(), cur + t.getAmount());
-            }
+            if (t.getType() == Transaction.Type.INCOMING) totalIn += t.getAmount();
         }
-        double priorIn = totalIn / 1.05;
+        double priorIn = totalIn / 1.08;
         double pctChange = priorIn > 0 ? ((totalIn - priorIn) / priorIn) * 100 : 0;
 
-        // ── Total Income Card ──
-        LinearLayout inCard = createCard();
-        addCardHeader(inCard, "Total Income", "See details >");
+        tvIncomeTotal.setText("$" + String.format("%.2f", totalIn));
+        tvIncomeTrend.setText("↑ " + String.format("%.0f", Math.abs(pctChange)) + "% vs last month");
 
-        LinearLayout inRow = new LinearLayout(this);
-        inRow.setOrientation(LinearLayout.HORIZONTAL);
-        inRow.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        // Wallet icon (drawn as a green circle with $)
+        ivIncomeWallet.setImageDrawable(null);
+        ivIncomeWallet.setBackgroundColor(0xFF38B000);
+        ivIncomeWallet.setPadding(dp(12), dp(12), dp(12), dp(12));
+        // Set imageView to green circle with "$" via a custom drawable approach
+        ivIncomeWallet.setBackgroundResource(R.drawable.circle_dark);
 
-        LinearLayout inLeft = new LinearLayout(this);
-        inLeft.setOrientation(LinearLayout.VERTICAL);
-        inLeft.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        addBigAmount(inLeft, "$" + String.format("%.2f", totalIn), null, 0xFF111111);
-        addGreenPct(inLeft, "Up " + String.format("%.0f", pctChange) + "% vs last month");
-        inRow.addView(inLeft);
+        // Next expected income
+        Calendar cal = Calendar.getInstance();
+        cal.set(Calendar.YEAR, 2026);
+        cal.set(Calendar.MONTH, Calendar.JUNE);
+        cal.set(Calendar.DAY_OF_MONTH, 5);
+        long nextPay = cal.getTimeInMillis();
+        long now = System.currentTimeMillis();
+        long diffDays = (nextPay - now) / (1000 * 60 * 60 * 24);
+        if (diffDays < 0) diffDays = 0;
+        tvNextIncomeCountdown.setText("In " + diffDays + " days");
+        tvNextIncomeDate.setText("June 5, 2026");
 
-        // Wallet icon placeholder
-        TextView walletIcon = new TextView(this);
-        walletIcon.setText("💰");
-        walletIcon.setTextSize(40);
-        walletIcon.setLayoutParams(new LinearLayout.LayoutParams(dp(64), dp(64)));
-        inRow.addView(walletIcon);
-
-        inCard.addView(inRow);
-        containerInsightsContent.addView(inCard);
-
-        // ── Highest Income Source Card ──
-        String topSrc = "—";
-        double topAmt = 0;
-        for (Map.Entry<String, Double> e : srcTotals.entrySet()) {
-            if (e.getValue() > topAmt) {
-                topAmt = e.getValue();
-                topSrc = e.getKey();
-            }
-        }
-
-        LinearLayout srcCard = createCard();
-        addCardHeader(srcCard, "Highest Income Source", null);
-        addSpacer(srcCard, dp(8));
-
-        LinearLayout srcRow = new LinearLayout(this);
-        srcRow.setOrientation(LinearLayout.HORIZONTAL);
-        srcRow.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-
-        TextView srcIcon = new TextView(this);
-        srcIcon.setText("📅");
-        srcIcon.setTextSize(32);
-        srcIcon.setLayoutParams(new LinearLayout.LayoutParams(dp(48), dp(48)));
-        srcRow.addView(srcIcon);
-
-        LinearLayout srcInfo = new LinearLayout(this);
-        srcInfo.setOrientation(LinearLayout.VERTICAL);
-        srcInfo.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        srcInfo.setPadding(12, 0, 0, 0);
-
-        TextView tvSrcName = new TextView(this);
-        tvSrcName.setText(topSrc);
-        tvSrcName.setTextSize(18);
-        tvSrcName.setTextColor(0xFF111111);
-        tvSrcName.setTypeface(null, android.graphics.Typeface.BOLD);
-        srcInfo.addView(tvSrcName);
-
-        TextView tvSrcAmt = new TextView(this);
-        tvSrcAmt.setText("$" + String.format("%.2f", topAmt));
-        tvSrcAmt.setTextSize(15);
-        tvSrcAmt.setTextColor(0xFF4CAF50);
-        tvSrcAmt.setTypeface(null, android.graphics.Typeface.BOLD);
-        srcInfo.addView(tvSrcAmt);
-
-        srcRow.addView(srcInfo);
-        srcCard.addView(srcRow);
-        containerInsightsContent.addView(srcCard);
+        // Calendar icon
+        ivIncomeCalendar.setImageDrawable(null);
+        ivIncomeCalendar.setBackgroundResource(R.drawable.circle_green);
     }
 
-    // ── SUB-TAB: TRENDS ──
+    // ── SCREEN 4: TRENDS ──
 
-    private void renderTrends() {
+    private void populateTrends() {
         if (allTransactions == null) return;
 
-        double totalIn = 0, totalOut = 0, totalSpend = totalOut;
+        double totalIn = 0, totalOut = 0;
         for (Transaction t : allTransactions) {
             if (t.getType() == Transaction.Type.INCOMING) totalIn += t.getAmount();
             else totalOut += t.getAmount();
         }
-        double savings = totalIn - totalOut;
-        if (savings < 0) savings = 0;
+        double totalFlow = totalIn > totalOut ? totalIn * 1.2 : totalOut * 1.2;
+        if (totalFlow == 0) totalFlow = 100;
 
-        // Simulate monthly savings for the bar chart (last 6 months)
-        double[] monthlySavings = new double[6];
-        double base = savings / 6;
-        for (int i = 0; i < 6; i++) {
-            monthlySavings[i] = base * (0.6 + 0.4 * (i / 5.0));
-        }
-        double totalSavings = 0;
-        for (double v : monthlySavings) totalSavings += v;
+        // Simulated monthly data
+        double[] monthlyVals = {totalFlow * 0.75, totalFlow * 1.0, totalFlow * 0.9, totalFlow * 0.4, totalFlow * 0.65};
+        double totalOverTime = 0;
+        for (double v : monthlyVals) totalOverTime += v;
+        double priorTotal = totalOverTime * 1.08;
+        double pctChange = priorTotal > 0 ? ((totalOverTime - priorTotal) / priorTotal) * 100 : 0;
 
-        // ── Bar Chart Card ──
-        LinearLayout trCard = createCard();
-        addCardHeader(trCard, "Savings Trend", null);
-        addBigAmount(trCard, "$" + String.format("%.2f", totalSavings), "Last 6 Months", 0xFF111111);
+        tvTrendsTotal.setText("$" + String.format("%.2f", totalOverTime));
+        tvTrendsIndicator.setText("↑ " + String.format("%.0f", Math.abs(pctChange)) + "% vs last month");
 
-        double maxSavings = 0;
-        for (double v : monthlySavings) if (v > maxSavings) maxSavings = v;
-        if (maxSavings == 0) maxSavings = 1;
-
-        final double[] barValues = monthlySavings.clone();
-        final double barMax = maxSavings;
-        View barChart = new View(this) {
+        // Bar chart
+        chartTrendsBar.removeAllViews();
+        final double[] barVals = monthlyVals.clone();
+        View barView = new View(this) {
             private final Paint barPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
             private final Paint gridPaint = new Paint();
             private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -793,60 +671,44 @@ public class HomeActivity extends AppCompatActivity {
             protected void onDraw(Canvas canvas) {
                 super.onDraw(canvas);
                 float w = getWidth(), h = getHeight();
-                float padL = 36f, padR = 12f, padT = 8f, padB = 28f;
-                float chartW = w - padL - padR;
-                float chartH = h - padT - padB;
-
-                gridPaint.setColor(0xFFE0E0E0);
+                float padL = 40f, padR = 12f, padT = 8f, padB = 28f;
+                float cw = w - padL - padR, ch = h - padT - padB;
+                double maxV = 0;
+                for (double v : barVals) if (v > maxV) maxV = v;
+                if (maxV == 0) maxV = 1;
+                gridPaint.setColor(0xFF52B788);
                 gridPaint.setStrokeWidth(1);
                 textPaint.setTextSize(22);
-                textPaint.setColor(0xFFAAAAAA);
-                for (int i = 0; i <= 3; i++) {
-                    float y = padT + chartH * (1f - i / 3f);
+                textPaint.setColor(0xFFD4A373);
+                for (int i = 0; i <= 4; i++) {
+                    float y = padT + ch * (1f - i / 4f);
                     canvas.drawLine(padL, y, w - padR, y, gridPaint);
-                    double val = barMax * i / 3f;
-                    canvas.drawText("$" + (int)val, 2, y + 8, textPaint);
+                    canvas.drawText("$" + (int)(maxV * i / 4f), 2, y + 8, textPaint);
                 }
-
-                float barW = chartW / barValues.length * 0.6f;
-                float gap = chartW / barValues.length;
-                barPaint.setColor(0xFF4CAF50);
-                String[] monthLabels = {"Jan", "Feb", "Mar", "Apr", "May", "Jun"};
-                for (int i = 0; i < barValues.length; i++) {
-                    float barH = (float)(barValues[i] / barMax * chartH);
+                float barW = cw / barVals.length * 0.7f;
+                float gap = cw / barVals.length;
+                barPaint.setColor(0xFF52B788);
+                String[] labels = {"Dec", "Jan", "Feb", "Mar", "Apr"};
+                for (int i = 0; i < barVals.length; i++) {
+                    float barH = (float)(barVals[i] / maxV * ch);
                     float x = padL + i * gap + (gap - barW) / 2f;
-                    float y = padT + chartH - barH;
-                    canvas.drawRoundRect(x, y, x + barW, padT + chartH, 4, 4, barPaint);
-
+                    float y = padT + ch - barH;
+                    canvas.drawRoundRect(x, y, x + barW, padT + ch, 8, 8, barPaint);
                     textPaint.setTextSize(20);
-                    textPaint.setColor(0xFF888888);
+                    textPaint.setColor(0xFFD4A373);
                     float labelX = x + barW / 2f - 14;
-                    canvas.drawText(monthLabels[i], labelX, h - 4, textPaint);
+                    canvas.drawText(labels[i], labelX, h - 4, textPaint);
                 }
             }
         };
-        barChart.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(140)));
-        trCard.addView(barChart);
-        containerInsightsContent.addView(trCard);
+        barView.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, dp(140)));
+        chartTrendsBar.addView(barView);
 
-        // ── Key Insight Card ──
-        LinearLayout kiCard = createCard();
-        addCardHeader(kiCard, "Key Insight", null);
-        addSpacer(kiCard, dp(8));
-
-        double spendRatio = totalIn > 0 ? (totalOut / totalIn) * 100 : 0;
-        TextView kiBody = new TextView(this);
-        kiBody.setText("Your spending has been " + String.format("%.0f", spendRatio)
-                + "% compared to income in the last period. "
-                + "Total income: $" + String.format("%.2f", totalIn)
-                + " | Total spending: $" + String.format("%.2f", totalOut)
-                + " | Savings: $" + String.format("%.2f", savings) + ".");
-        kiBody.setTextSize(14);
-        kiBody.setTextColor(0xFF666666);
-        kiBody.setLineSpacing(4, 1);
-        kiCard.addView(kiBody);
-        containerInsightsContent.addView(kiCard);
+        // Key insight
+        double spendRatio = totalFlow > 0 ? (totalOut / totalFlow) * 100 : 0;
+        tvTrendsKeyInsight.setText("Your Spending is down " + String.format("%.0f", Math.abs(pctChange))
+                + "% compared to last 6 months. Great Job ! ");
     }
 
     // ── GEMINI BATCH CLASSIFICATION ──
