@@ -46,259 +46,350 @@
                     android:paddingHorizontal="20dp"
                     android:layout_marginTop="8dp">
 
-                <!-- Profile Card -->
-                <androidx.cardview.widget.CardView
+                <!-- Profile (no card background) -->
+                <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        app:cardBackgroundColor="#FFFFFF"
-                        app:cardCornerRadius="24dp"
-                        app:cardElevation="2dp">
+                        android:orientation="horizontal"
+                        android:padding="4dp"
+                        android:layout_marginTop="8dp"
+                        android:gravity="center_vertical">
+
+                    <ImageView
+                            android:id="@+id/iv_settings_avatar"
+                            android:layout_width="56dp"
+                            android:layout_height="56dp"
+                            android:background="@drawable/circle_green"
+                            android:contentDescription="Avatar" />
+
                     <LinearLayout
-                            android:layout_width="match_parent"
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:padding="20dp"
-                            android:gravity="center_vertical">
-
-                        <ImageView
-                                android:id="@+id/iv_settings_avatar"
-                                android:layout_width="56dp"
-                                android:layout_height="56dp"
-                                android:background="@drawable/circle_green"
-                                android:contentDescription="Avatar" />
-
-                        <LinearLayout
-                                android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:paddingStart="16dp">
+                        <TextView
+                                android:id="@+id/tv_settings_name"
+                                android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:orientation="vertical"
-                                android:paddingStart="16dp">
-                            <TextView
-                                    android:id="@+id/tv_settings_name"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="User Name"
-                                    android:textColor="#000000"
-                                    android:textSize="18sp"
-                                    android:textStyle="bold" />
-                            <TextView
-                                    android:id="@+id/tv_settings_email"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="user@email.com"
-                                    android:textColor="#D4A373"
-                                    android:textSize="13sp"
-                                    android:layout_marginTop="2dp" />
-                        </LinearLayout>
+                                android:text="User Name"
+                                android:textColor="#000000"
+                                android:textSize="18sp"
+                                android:textStyle="bold" />
+                        <TextView
+                                android:id="@+id/tv_settings_email"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="user@email.com"
+                                android:textColor="#D4A373"
+                                android:textSize="13sp"
+                                android:layout_marginTop="2dp" />
                     </LinearLayout>
-                </androidx.cardview.widget.CardView>
+                </LinearLayout>
 
-                <!-- Settings Menu -->
+                <!-- ═══ PREFERENCES SECTION ═══ -->
                 <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Preferences"
-                        android:textColor="#D4A373"
-                        android:textSize="13sp"
+                        android:textColor="#000000"
+                        android:textSize="15sp"
+                        android:textStyle="bold"
+                        android:layout_marginTop="28dp"
+                        android:layout_marginBottom="8dp" />
+
+                <androidx.cardview.widget.CardView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        app:cardBackgroundColor="#FFFFFF"
+                        app:cardCornerRadius="20dp"
+                        app:cardElevation="0dp"
+                        app:cardUseCompatPadding="true"
+                        android:foreground="?attr/selectableItemBackground">
+
+                    <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:paddingHorizontal="4dp">
+
+                        <!-- Merchant Nicknames -->
+                        <LinearLayout
+                                android:id="@+id/btn_settings_merchant_nicknames"
+                                android:layout_width="match_parent"
+                                android:layout_height="56dp"
+                                android:orientation="horizontal"
+                                android:gravity="center_vertical"
+                                android:paddingHorizontal="16dp"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:foreground="?attr/selectableItemBackground">
+                            <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:text="Merchant Nicknames"
+                                    android:textColor="#000000"
+                                    android:textSize="16sp" />
+                            <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="›"
+                                    android:textColor="#D4A373"
+                                    android:textSize="20sp" />
+                        </LinearLayout>
+
+                        <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F0E8D5" android:layout_marginHorizontal="16dp" />
+
+                        <!-- Email Scanning Setting -->
+                        <LinearLayout
+                                android:id="@+id/btn_settings_mail_scanning"
+                                android:layout_width="match_parent"
+                                android:layout_height="56dp"
+                                android:orientation="horizontal"
+                                android:gravity="center_vertical"
+                                android:paddingHorizontal="16dp"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:foreground="?attr/selectableItemBackground">
+                            <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:text="Email Scanning Setting"
+                                    android:textColor="#000000"
+                                    android:textSize="16sp" />
+                            <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="›"
+                                    android:textColor="#D4A373"
+                                    android:textSize="20sp" />
+                        </LinearLayout>
+
+                        <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F0E8D5" android:layout_marginHorizontal="16dp" />
+
+                        <!-- Subscription Tracker -->
+                        <LinearLayout
+                                android:id="@+id/btn_settings_subscriptions"
+                                android:layout_width="match_parent"
+                                android:layout_height="56dp"
+                                android:orientation="horizontal"
+                                android:gravity="center_vertical"
+                                android:paddingHorizontal="16dp"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:foreground="?attr/selectableItemBackground">
+                            <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:text="Subscription Tracker"
+                                    android:textColor="#000000"
+                                    android:textSize="16sp" />
+                            <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="›"
+                                    android:textColor="#D4A373"
+                                    android:textSize="20sp" />
+                        </LinearLayout>
+
+                        <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F0E8D5" android:layout_marginHorizontal="16dp" />
+
+                        <!-- Categories -->
+                        <LinearLayout
+                                android:id="@+id/btn_settings_categories"
+                                android:layout_width="match_parent"
+                                android:layout_height="56dp"
+                                android:orientation="horizontal"
+                                android:gravity="center_vertical"
+                                android:paddingHorizontal="16dp"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:foreground="?attr/selectableItemBackground">
+                            <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:text="Categories"
+                                    android:textColor="#000000"
+                                    android:textSize="16sp" />
+                            <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="›"
+                                    android:textColor="#D4A373"
+                                    android:textSize="20sp" />
+                        </LinearLayout>
+
+                        <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F0E8D5" android:layout_marginHorizontal="16dp" />
+
+                        <!-- Budget Goals -->
+                        <LinearLayout
+                                android:id="@+id/btn_settings_budget_goals"
+                                android:layout_width="match_parent"
+                                android:layout_height="56dp"
+                                android:orientation="horizontal"
+                                android:gravity="center_vertical"
+                                android:paddingHorizontal="16dp"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:foreground="?attr/selectableItemBackground">
+                            <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:text="Budget Goals"
+                                    android:textColor="#000000"
+                                    android:textSize="16sp" />
+                            <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="›"
+                                    android:textColor="#D4A373"
+                                    android:textSize="20sp" />
+                        </LinearLayout>
+
+                        <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F0E8D5" android:layout_marginHorizontal="16dp" />
+
+                        <!-- Notifications -->
+                        <LinearLayout
+                                android:id="@+id/btn_settings_notifications"
+                                android:layout_width="match_parent"
+                                android:layout_height="56dp"
+                                android:orientation="horizontal"
+                                android:gravity="center_vertical"
+                                android:paddingHorizontal="16dp"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:foreground="?attr/selectableItemBackground">
+                            <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:text="Notifications"
+                                    android:textColor="#000000"
+                                    android:textSize="16sp" />
+                            <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="›"
+                                    android:textColor="#D4A373"
+                                    android:textSize="20sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
+
+                <!-- ═══ SUPPORT SECTION ═══ -->
+                <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Support"
+                        android:textColor="#000000"
+                        android:textSize="15sp"
                         android:textStyle="bold"
                         android:layout_marginTop="24dp"
                         android:layout_marginBottom="8dp" />
 
-                <LinearLayout
-                        android:id="@+id/btn_settings_subscriptions"
+                <androidx.cardview.widget.CardView
                         android:layout_width="match_parent"
-                        android:layout_height="56dp"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:paddingHorizontal="16dp"
-                        android:background="#FFFFFF"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:foreground="?attr/selectableItemBackground">
-                    <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="Subscriptions"
-                            android:textColor="#000000"
-                            android:textSize="16sp" />
-                    <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="›"
-                            android:textColor="#D4A373"
-                            android:textSize="20sp" />
-                </LinearLayout>
-
-                <LinearLayout
-                        android:id="@+id/btn_settings_budget_goals"
-                        android:layout_width="match_parent"
-                        android:layout_height="56dp"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:paddingHorizontal="16dp"
-                        android:background="#FFFFFF"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:foreground="?attr/selectableItemBackground">
-                    <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="Budget Goals"
-                            android:textColor="#000000"
-                            android:textSize="16sp" />
-                    <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="›"
-                            android:textColor="#D4A373"
-                            android:textSize="20sp" />
-                </LinearLayout>
-
-                <LinearLayout
-                        android:id="@+id/btn_settings_merchant_nicknames"
-                        android:layout_width="match_parent"
-                        android:layout_height="56dp"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:paddingHorizontal="16dp"
-                        android:background="#FFFFFF"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:foreground="?attr/selectableItemBackground">
-                    <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="Merchant Nicknames"
-                            android:textColor="#000000"
-                            android:textSize="16sp" />
-                    <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="›"
-                            android:textColor="#D4A373"
-                            android:textSize="20sp" />
-                </LinearLayout>
-
-                <LinearLayout
-                        android:id="@+id/btn_settings_categories"
-                        android:layout_width="match_parent"
-                        android:layout_height="56dp"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:paddingHorizontal="16dp"
-                        android:background="#FFFFFF"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:foreground="?attr/selectableItemBackground">
-                    <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="Categories"
-                            android:textColor="#000000"
-                            android:textSize="16sp" />
-                    <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="›"
-                            android:textColor="#D4A373"
-                            android:textSize="20sp" />
-                </LinearLayout>
-
-                <TextView
-                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Tracking"
-                        android:textColor="#D4A373"
-                        android:textSize="13sp"
-                        android:textStyle="bold"
-                        android:layout_marginTop="20dp"
-                        android:layout_marginBottom="8dp" />
-
-                <LinearLayout
-                        android:id="@+id/btn_settings_auto_tracking"
-                        android:layout_width="match_parent"
-                        android:layout_height="56dp"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:paddingHorizontal="16dp"
-                        android:background="#FFFFFF"
-                        android:clickable="true"
-                        android:focusable="true"
+                        app:cardBackgroundColor="#FFFFFF"
+                        app:cardCornerRadius="20dp"
+                        app:cardElevation="0dp"
+                        app:cardUseCompatPadding="true"
                         android:foreground="?attr/selectableItemBackground">
-                    <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="Auto-Tracking"
-                            android:textColor="#000000"
-                            android:textSize="16sp" />
-                    <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="›"
-                            android:textColor="#D4A373"
-                            android:textSize="20sp" />
-                </LinearLayout>
 
-                <LinearLayout
-                        android:id="@+id/btn_settings_mail_scanning"
-                        android:layout_width="match_parent"
-                        android:layout_height="56dp"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:paddingHorizontal="16dp"
-                        android:background="#FFFFFF"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:foreground="?attr/selectableItemBackground">
-                    <TextView
-                            android:layout_width="0dp"
+                    <LinearLayout
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="Mail Scanning"
-                            android:textColor="#000000"
-                            android:textSize="16sp" />
-                    <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="›"
-                            android:textColor="#D4A373"
-                            android:textSize="20sp" />
-                </LinearLayout>
+                            android:orientation="vertical"
+                            android:paddingHorizontal="4dp">
 
-                <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Data"
-                        android:textColor="#D4A373"
-                        android:textSize="13sp"
-                        android:textStyle="bold"
-                        android:layout_marginTop="20dp"
-                        android:layout_marginBottom="8dp" />
+                        <!-- How It Works -->
+                        <LinearLayout
+                                android:id="@+id/btn_settings_how_it_works"
+                                android:layout_width="match_parent"
+                                android:layout_height="56dp"
+                                android:orientation="horizontal"
+                                android:gravity="center_vertical"
+                                android:paddingHorizontal="16dp"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:foreground="?attr/selectableItemBackground">
+                            <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:text="How It Works"
+                                    android:textColor="#000000"
+                                    android:textSize="16sp" />
+                            <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="›"
+                                    android:textColor="#D4A373"
+                                    android:textSize="20sp" />
+                        </LinearLayout>
 
-                <LinearLayout
-                        android:id="@+id/btn_settings_clear_data"
-                        android:layout_width="match_parent"
-                        android:layout_height="56dp"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:paddingHorizontal="16dp"
-                        android:background="#FFFFFF"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:foreground="?attr/selectableItemBackground">
-                    <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="Clear All Data"
-                            android:textColor="#E53935"
-                            android:textSize="16sp" />
-                </LinearLayout>
+                        <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F0E8D5" android:layout_marginHorizontal="16dp" />
+
+                        <!-- Privacy Policy -->
+                        <LinearLayout
+                                android:id="@+id/btn_settings_privacy_policy"
+                                android:layout_width="match_parent"
+                                android:layout_height="56dp"
+                                android:orientation="horizontal"
+                                android:gravity="center_vertical"
+                                android:paddingHorizontal="16dp"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:foreground="?attr/selectableItemBackground">
+                            <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:text="Privacy Policy"
+                                    android:textColor="#000000"
+                                    android:textSize="16sp" />
+                            <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="›"
+                                    android:textColor="#D4A373"
+                                    android:textSize="20sp" />
+                        </LinearLayout>
+
+                        <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F0E8D5" android:layout_marginHorizontal="16dp" />
+
+                        <!-- About SpotMyDime -->
+                        <LinearLayout
+                                android:id="@+id/btn_settings_about"
+                                android:layout_width="match_parent"
+                                android:layout_height="56dp"
+                                android:orientation="horizontal"
+                                android:gravity="center_vertical"
+                                android:paddingHorizontal="16dp"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:foreground="?attr/selectableItemBackground">
+                            <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:text="About SpotMyDime"
+                                    android:textColor="#000000"
+                                    android:textSize="16sp" />
+                            <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="›"
+                                    android:textColor="#D4A373"
+                                    android:textSize="20sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </androidx.cardview.widget.CardView>
 
                 <TextView
                         android:layout_width="wrap_content"

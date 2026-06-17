@@ -2192,46 +2192,52 @@ public class HomeActivity extends AppCompatActivity {
     }
 
     private void setupSettingsMainMenu() {
-        findViewById(R.id.btn_settings_subscriptions).setOnClickListener(v -> {
-            loadSettingsSubscriptions();
-            showSettingsScreen(containerSettingsSubscriptions);
-        });
-        findViewById(R.id.btn_settings_budget_goals).setOnClickListener(v -> {
-            loadSettingsBudgetGoals();
-            showSettingsScreen(containerSettingsBudgetGoals);
-        });
         findViewById(R.id.btn_settings_merchant_nicknames).setOnClickListener(v -> {
             loadSettingsNicknames();
             showSettingsScreen(containerSettingsNicknames);
-        });
-        findViewById(R.id.btn_settings_categories).setOnClickListener(v -> {
-            loadSettingsCategories();
-            showSettingsScreen(containerSettingsCategories);
-        });
-        findViewById(R.id.btn_settings_auto_tracking).setOnClickListener(v -> {
-            loadSettingsAutoTracking();
-            showSettingsScreen(containerSettingsAutoTracking);
         });
         findViewById(R.id.btn_settings_mail_scanning).setOnClickListener(v -> {
             loadSettingsMailScanning();
             showSettingsScreen(containerSettingsMailScanning);
         });
-        findViewById(R.id.btn_settings_clear_data).setOnClickListener(v -> {
+        findViewById(R.id.btn_settings_subscriptions).setOnClickListener(v -> {
+            loadSettingsSubscriptions();
+            showSettingsScreen(containerSettingsSubscriptions);
+        });
+        findViewById(R.id.btn_settings_categories).setOnClickListener(v -> {
+            loadSettingsCategories();
+            showSettingsScreen(containerSettingsCategories);
+        });
+        findViewById(R.id.btn_settings_budget_goals).setOnClickListener(v -> {
+            loadSettingsBudgetGoals();
+            showSettingsScreen(containerSettingsBudgetGoals);
+        });
+        findViewById(R.id.btn_settings_notifications).setOnClickListener(v -> {
+            Toast.makeText(this, "Notifications - coming soon", Toast.LENGTH_SHORT).show();
+        });
+        findViewById(R.id.btn_settings_how_it_works).setOnClickListener(v -> {
             new AlertDialog.Builder(this)
-                    .setTitle("Clear All Data?")
-                    .setMessage("This will delete all transactions, categories, and preferences. This cannot be undone.")
-                    .setPositiveButton("Clear", (dialog, which) -> {
-                        getSharedPreferences("vendor_categories", Context.MODE_PRIVATE).edit().clear().apply();
-                        getSharedPreferences("vendor_aliases", Context.MODE_PRIVATE).edit().clear().apply();
-                        getSharedPreferences("excluded_messages", Context.MODE_PRIVATE).edit().clear().apply();
-                        getSharedPreferences("manual_transactions", Context.MODE_PRIVATE).edit().clear().apply();
-                        getSharedPreferences("settings_prefs", Context.MODE_PRIVATE).edit().clear().apply();
-                        budgets.clear();
-                        subscriptions.clear();
-                        trackedSenders.clear();
-                        Toast.makeText(this, "All data cleared", Toast.LENGTH_SHORT).show();
-                    })
-                    .setNegativeButton("Cancel", null)
+                    .setTitle("How It Works")
+                    .setMessage("SpotMyDime automatically tracks your spending by scanning your Gmail inbox for transaction receipts. "
+                            + "Transactions are categorized, visualized, and summarized so you always know where your money goes.")
+                    .setPositiveButton("Got it", null)
+                    .show();
+        });
+        findViewById(R.id.btn_settings_privacy_policy).setOnClickListener(v -> {
+            new AlertDialog.Builder(this)
+                    .setTitle("Privacy Policy")
+                    .setMessage("Your data stays on your device. SpotMyDime does not upload, share, or sell your personal or financial information. "
+                            + "Gmail data is accessed only with your explicit permission and processed locally.")
+                    .setPositiveButton("Got it", null)
+                    .show();
+        });
+        findViewById(R.id.btn_settings_about).setOnClickListener(v -> {
+            new AlertDialog.Builder(this)
+                    .setTitle("About SpotMyDime")
+                    .setMessage("Version 1.0.0\n\n"
+                            + "A smart expense tracker that uses AI to automatically categorize your transactions from Gmail. "
+                            + "Built with love for personal finance.")
+                    .setPositiveButton("OK", null)
                     .show();
         });
     }
