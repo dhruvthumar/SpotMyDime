@@ -1197,7 +1197,7 @@
             android:background="@drawable/nav_bar_bg"
             android:elevation="8dp"
             android:paddingHorizontal="6dp"
-            android:clipToPadding="false">
+            android:clipToPadding="false" android:outlineProvider="none">
 
         <LinearLayout
                 android:id="@+id/nav_home"
@@ -1214,7 +1214,7 @@
                     android:layout_width="30dp"
                     android:layout_height="30dp"
                     android:src="@drawable/tab_1"
-                    android:contentDescription="Tab 1" />
+                    android:contentDescription="Tab 1"/>
         </LinearLayout>
 
         <LinearLayout
@@ -1232,7 +1232,7 @@
                     android:layout_width="30dp"
                     android:layout_height="30dp"
                     android:src="@drawable/tab_2"
-                    android:contentDescription="Tab 2" />
+                    android:contentDescription="Tab 2"/>
         </LinearLayout>
 
         <LinearLayout
@@ -1250,7 +1250,7 @@
                     android:layout_width="30dp"
                     android:layout_height="30dp"
                     android:src="@drawable/tab_3"
-                    android:contentDescription="Tab 3" />
+                    android:contentDescription="Tab 3"/>
         </LinearLayout>
 
         <LinearLayout
@@ -1268,7 +1268,7 @@
                     android:layout_width="30dp"
                     android:layout_height="30dp"
                     android:src="@drawable/tab_4"
-                    android:contentDescription="Tab 4" />
+                    android:contentDescription="Tab 4"/>
         </LinearLayout>
 
         <LinearLayout
@@ -1286,7 +1286,7 @@
                     android:layout_width="30dp"
                     android:layout_height="30dp"
                     android:src="@drawable/tab_5"
-                    android:contentDescription="Tab 5" />
+                    android:contentDescription="Tab 5"/>
         </LinearLayout>
 
     </LinearLayout>

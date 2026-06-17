@@ -20,6 +20,7 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Button;
 import android.text.Editable;
+import android.text.SpannableStringBuilder;
 import android.text.TextWatcher;
 import android.widget.Toast;
 
@@ -51,6 +52,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -289,9 +291,35 @@ public class HomeActivity extends AppCompatActivity {
         }
     }
 
+    @Override
+    public void onBackPressed() {
+        if (containerSettingsMailScanning.getVisibility() == View.VISIBLE ||
+            containerSettingsNicknames.getVisibility() == View.VISIBLE ||
+            containerSettingsSubscriptions.getVisibility() == View.VISIBLE ||
+            containerSettingsBudgetGoals.getVisibility() == View.VISIBLE ||
+            containerSettingsCategories.getVisibility() == View.VISIBLE ||
+            containerSettingsEditCategory.getVisibility() == View.VISIBLE ||
+            containerSettingsAutoTracking.getVisibility() == View.VISIBLE) {
+            showSettingsScreen(containerSettingsMain);
+            return;
+        }
+        if (selectedTab == 4) {
+            setSelectedTab(0);
+            return;
+        }
+        super.onBackPressed();
+    }
+
     private int getCategoryColor(String cat) {
         if (cat == null) return 0xFF757575;
-        switch (cat.toLowerCase()) {
+        String lower = cat.toLowerCase();
+        List<Map<String, Object>> defs = loadCategoryDefs();
+        for (Map<String, Object> m : defs) {
+            if (((String) m.get("name")).toLowerCase().equals(lower)) {
+                return (int) m.get("color");
+            }
+        }
+        switch (lower) {
             case "food & dining": return 0xFF29B6F6;
             case "shopping": return 0xFFFFA726;
             case "subscriptions": return 0xFF8E24AA;
@@ -1319,11 +1347,17 @@ public class HomeActivity extends AppCompatActivity {
                             }
                         }
                     }
-                    allTransactions = deduped;
-                    if (deduped.isEmpty()) {
+                    List<Transaction> filtered = new ArrayList<>();
+                    for (Transaction tx : deduped) {
+                        if (!isInPausedRange(tx.getDateMillis())) {
+                            filtered.add(tx);
+                        }
+                    }
+                    allTransactions = filtered;
+                    if (filtered.isEmpty()) {
                         addEmptyState();
                     } else {
-                        populateDashboard(deduped);
+                        populateDashboard(filtered);
                     }
                 });
             }
@@ -2267,26 +2301,111 @@ public class HomeActivity extends AppCompatActivity {
     private void loadSettingsSubscriptions() {
         LinearLayout list = findViewById(R.id.container_subscriptions_list);
         list.removeAllViews();
-        if (subscriptions.isEmpty()) {
-            subscriptions.add(createSub("Netflix", 15.99, "Monthly", "June 15, 2026"));
-            subscriptions.add(createSub("Spotify", 9.99, "Monthly", "June 21, 2026"));
-            subscriptions.add(createSub("iCloud+", 2.99, "Monthly", "June 8, 2026"));
-            subscriptions.add(createSub("Amazon Prime", 139.00, "Yearly", "March 3, 2027"));
-        }
-        for (Map<String, String> sub : subscriptions) {
+
+        List<Map<String, String>> detected = detectRecurringSubscriptions();
+        for (Map<String, String> sub : detected) {
             list.addView(createSubscriptionCard(sub));
         }
-        findViewById(R.id.btn_add_subscription).setOnClickListener(v ->
-                Toast.makeText(this, "Add subscription - coming soon", Toast.LENGTH_SHORT).show());
+
+        String manualJson = settingsPrefs.getString("manual_subscriptions", "[]");
+        try {
+            JSONArray arr = new JSONArray(manualJson);
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.getJSONObject(i);
+                Map<String, String> m = new HashMap<>();
+                m.put("name", o.getString("name"));
+                m.put("amount", o.getString("amount"));
+                m.put("frequency", o.getString("frequency"));
+                m.put("nextDate", o.getString("nextDate"));
+                list.addView(createSubscriptionCard(m));
+            }
+        } catch (Exception ignored) {}
+
+        if (list.getChildCount() == 0) {
+            TextView empty = new TextView(this);
+            empty.setText("No subscriptions detected yet.\nAs recurring transactions are found,\nthey will appear here.");
+            empty.setTextColor(0xFF888888);
+            empty.setTextSize(14);
+            empty.setGravity(android.view.Gravity.CENTER);
+            empty.setPadding(0, dp(24), 0, dp(24));
+            list.addView(empty);
+        }
+
+        findViewById(R.id.btn_add_subscription).setOnClickListener(v -> showAddSubscriptionDialog());
     }
 
-    private Map<String, String> createSub(String name, double amount, String freq, String next) {
-        Map<String, String> m = new HashMap<>();
-        m.put("name", name);
-        m.put("amount", String.format("%.2f", amount));
-        m.put("frequency", freq);
-        m.put("nextDate", next);
-        return m;
+    private List<Map<String, String>> detectRecurringSubscriptions() {
+        Map<String, List<Double>> merchantAmounts = new HashMap<>();
+        Map<String, List<Long>> merchantDates = new HashMap<>();
+
+        if (allTransactions != null) {
+            for (Transaction t : allTransactions) {
+                if (t.getType() == Transaction.Type.INCOMING) continue;
+                String name = t.getMerchant();
+                if (name == null || name.isEmpty()) continue;
+                String key = name.toLowerCase().trim();
+                merchantAmounts.computeIfAbsent(key, k -> new ArrayList<>()).add(t.getAmount());
+                merchantDates.computeIfAbsent(key, k -> new ArrayList<>()).add(t.getDateMillis());
+            }
+        }
+
+        List<Map<String, String>> result = new ArrayList<>();
+        for (String key : merchantAmounts.keySet()) {
+            List<Double> amounts = merchantAmounts.get(key);
+            List<Long> dates = merchantDates.get(key);
+            if (amounts.size() < 2) continue;
+
+            double avgAmount = 0;
+            for (double a : amounts) avgAmount += a;
+            avgAmount /= amounts.size();
+
+            double maxDev = 0;
+            for (double a : amounts) maxDev = Math.max(maxDev, Math.abs(a - avgAmount));
+            if (maxDev > avgAmount * 0.5) continue;
+
+            Collections.sort(dates);
+            long minGap = Long.MAX_VALUE;
+            long totalGap = 0;
+            int gapCount = 0;
+            for (int i = 1; i < dates.size(); i++) {
+                long gap = dates.get(i) - dates.get(i - 1);
+                if (gap < minGap) minGap = gap;
+                totalGap += gap;
+                gapCount++;
+            }
+            long avgGap = gapCount > 0 ? totalGap / gapCount : 0;
+            if (avgGap < 20 * 86400000L) continue;
+
+            String freq;
+            if (avgGap > 300 * 86400000L) freq = "Yearly";
+            else if (avgGap > 80 * 86400000L) freq = "Quarterly";
+            else if (avgGap > 45 * 86400000L) freq = "Bi-monthly";
+            else if (avgGap > 25 * 86400000L) freq = "Monthly";
+            else if (avgGap > 12 * 86400000L) freq = "Bi-weekly";
+            else freq = "Weekly";
+
+            long lastDate = dates.get(dates.size() - 1);
+            long nextDate = lastDate + avgGap;
+            String nextDisplay = new SimpleDateFormat("MM-dd, yyyy", Locale.US).format(new Date(nextDate));
+
+            Map<String, String> sub = new HashMap<>();
+            sub.put("name", key.substring(0, 1).toUpperCase() + key.substring(1));
+            sub.put("amount", String.format("%.2f", avgAmount));
+            sub.put("frequency", freq);
+            sub.put("nextDate", nextDisplay);
+            result.add(sub);
+        }
+
+        result.sort((a, b) -> {
+            try {
+                SimpleDateFormat sdf = new SimpleDateFormat("MM-dd, yyyy", Locale.US);
+                Date da = sdf.parse(a.get("nextDate"));
+                Date db = sdf.parse(b.get("nextDate"));
+                return da.compareTo(db);
+            } catch (Exception e) { return 0; }
+        });
+
+        return result;
     }
 
     private View createSubscriptionCard(Map<String, String> sub) {
@@ -2337,6 +2456,79 @@ public class HomeActivity extends AppCompatActivity {
         row.addView(textCol);
         card.addView(row);
         return card;
+    }
+
+    private void showAddSubscriptionDialog() {
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(dp(24), dp(16), dp(24), dp(16));
+        EditText etName = new EditText(this);
+        etName.setHint("Service name (e.g. Netflix)");
+        etName.setTextSize(14);
+        etName.setBackgroundResource(R.drawable.input_outline);
+        etName.setPadding(dp(16), dp(12), dp(16), dp(12));
+        layout.addView(etName);
+        EditText etAmount = new EditText(this);
+        etAmount.setHint("Amount (e.g. 15.99)");
+        etAmount.setTextSize(14);
+        etAmount.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        etAmount.setBackgroundResource(R.drawable.input_outline);
+        etAmount.setPadding(dp(16), dp(12), dp(16), dp(12));
+        android.view.ViewGroup.MarginLayoutParams mp = (android.view.ViewGroup.MarginLayoutParams) etAmount.getLayoutParams();
+        if (mp != null) mp.topMargin = dp(12);
+        else {
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.topMargin = dp(12);
+            etAmount.setLayoutParams(lp);
+        }
+        layout.addView(etAmount);
+        String[] frequencies = {"Weekly", "Bi-weekly", "Monthly", "Bi-monthly", "Quarterly", "Yearly"};
+        final int[] selectedFreq = {2};
+        new AlertDialog.Builder(this)
+                .setTitle("Add Subscription")
+                .setView(layout)
+                .setSingleChoiceItems(frequencies, selectedFreq[0], (dialog, which) -> selectedFreq[0] = which)
+                .setPositiveButton("Add", (dialog, which) -> {
+                    String name = etName.getText().toString().trim();
+                    String amtStr = etAmount.getText().toString().trim();
+                    if (name.isEmpty() || amtStr.isEmpty()) {
+                        Toast.makeText(this, "Both fields required", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    double amt;
+                    try { amt = Double.parseDouble(amtStr); } catch (Exception e) {
+                        Toast.makeText(this, "Invalid amount", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    String freq = frequencies[selectedFreq[0]];
+                    long now = System.currentTimeMillis();
+                    long intervalMs;
+                    switch (selectedFreq[0]) {
+                        case 0: intervalMs = 7L * 86400000L; break;
+                        case 1: intervalMs = 14L * 86400000L; break;
+                        case 2: intervalMs = 30L * 86400000L; break;
+                        case 3: intervalMs = 60L * 86400000L; break;
+                        case 4: intervalMs = 91L * 86400000L; break;
+                        case 5: intervalMs = 365L * 86400000L; break;
+                        default: intervalMs = 30L * 86400000L;
+                    }
+                    String nextDate = new SimpleDateFormat("MM-dd, yyyy", Locale.US).format(new Date(now + intervalMs));
+                    String json = settingsPrefs.getString("manual_subscriptions", "[]");
+                    try {
+                        JSONArray arr = new JSONArray(json);
+                        JSONObject o = new JSONObject();
+                        o.put("name", name);
+                        o.put("amount", String.format("%.2f", amt));
+                        o.put("frequency", freq);
+                        o.put("nextDate", nextDate);
+                        arr.put(o);
+                        settingsPrefs.edit().putString("manual_subscriptions", arr.toString()).apply();
+                    } catch (Exception ignored) {}
+                    loadSettingsSubscriptions();
+                    Toast.makeText(this, "Subscription added", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private void loadSettingsBudgetGoals() {
@@ -2434,18 +2626,50 @@ public class HomeActivity extends AppCompatActivity {
         LinearLayout list = findViewById(R.id.container_nicknames_list);
         list.removeAllViews();
         Map<String, String> aliases = aliasStore.getAll();
-        if (aliases.isEmpty()) {
+
+        Set<String> merchantNames = new LinkedHashSet<>();
+        if (allTransactions != null) {
+            for (Transaction t : allTransactions) {
+                String name = t.getRawVendor() != null ? t.getRawVendor() : t.getMerchant();
+                if (name != null && !name.isEmpty()) {
+                    merchantNames.add(name);
+                }
+            }
+        }
+
+        boolean hasAny = false;
+
+        for (String merchant : merchantNames) {
+            String alias = aliases.get(merchant);
+            if (alias != null) {
+                list.addView(createNicknameCard(merchant, alias));
+                hasAny = true;
+            }
+        }
+
+        for (String merchant : merchantNames) {
+            String alias = aliases.get(merchant);
+            if (alias == null) {
+                list.addView(createMerchantNicknamePrompt(merchant));
+                hasAny = true;
+            }
+        }
+
+        for (Map.Entry<String, String> entry : aliases.entrySet()) {
+            if (!merchantNames.contains(entry.getKey())) {
+                list.addView(createNicknameCard(entry.getKey(), entry.getValue()));
+                hasAny = true;
+            }
+        }
+
+        if (!hasAny) {
             TextView empty = new TextView(this);
-            empty.setText("No merchant nicknames set yet.\nTap + to add one.");
+            empty.setText("No merchants found.\nAdd transactions first, or tap + to add manually.");
             empty.setTextColor(0xFF888888);
             empty.setTextSize(14);
             empty.setGravity(android.view.Gravity.CENTER);
             empty.setPadding(0, dp(24), 0, dp(24));
             list.addView(empty);
-        } else {
-            for (Map.Entry<String, String> entry : aliases.entrySet()) {
-                list.addView(createNicknameCard(entry.getKey(), entry.getValue()));
-            }
         }
         findViewById(R.id.btn_add_nickname).setOnClickListener(v -> showAddNicknameDialog());
     }
@@ -2494,6 +2718,80 @@ public class HomeActivity extends AppCompatActivity {
         return card;
     }
 
+    private View createMerchantNicknamePrompt(String merchant) {
+        CardView card = new CardView(this);
+        card.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(64)));
+        card.setCardBackgroundColor(0xFFFFFFFF);
+        card.setRadius(dp(16));
+        card.setCardElevation(1);
+        ((LinearLayout.LayoutParams) card.getLayoutParams()).bottomMargin = dp(8);
+        LinearLayout row = new LinearLayout(this);
+        row.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(16), dp(8), dp(16), dp(8));
+        LinearLayout textCol = new LinearLayout(this);
+        textCol.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        textCol.setOrientation(LinearLayout.VERTICAL);
+        TextView tvMerchant = new TextView(this);
+        tvMerchant.setText(merchant);
+        tvMerchant.setTextSize(15);
+        tvMerchant.setTextColor(0xFF000000);
+        tvMerchant.setTypeface(null, android.graphics.Typeface.BOLD);
+        textCol.addView(tvMerchant);
+        TextView tvHint = new TextView(this);
+        tvHint.setText("No nickname set");
+        tvHint.setTextSize(12);
+        tvHint.setTextColor(0xFF888888);
+        textCol.addView(tvHint);
+        row.addView(textCol);
+        TextView btnSet = new TextView(this);
+        btnSet.setText("Set Nickname");
+        btnSet.setTextSize(13);
+        btnSet.setTextColor(0xFFF9A84D);
+        btnSet.setTypeface(null, android.graphics.Typeface.BOLD);
+        btnSet.setPadding(dp(12), dp(8), dp(12), dp(8));
+        btnSet.setClickable(true);
+        btnSet.setFocusable(true);
+        btnSet.setOnClickListener(v -> showSetNicknameDialog(merchant));
+        row.addView(btnSet);
+        card.addView(row);
+        return card;
+    }
+
+    private void showSetNicknameDialog(String merchant) {
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(dp(24), dp(16), dp(24), dp(16));
+        TextView tvMerchant = new TextView(this);
+        tvMerchant.setText("Merchant: " + merchant);
+        tvMerchant.setTextSize(14);
+        tvMerchant.setTextColor(0xFF888888);
+        tvMerchant.setPadding(0, 0, 0, dp(12));
+        layout.addView(tvMerchant);
+        final EditText etAlias = new EditText(this);
+        etAlias.setHint("Nickname to display");
+        etAlias.setTextSize(14);
+        etAlias.setBackgroundResource(R.drawable.input_outline);
+        etAlias.setPadding(dp(16), dp(12), dp(16), dp(12));
+        layout.addView(etAlias);
+        new AlertDialog.Builder(this)
+                .setTitle("Set Nickname")
+                .setView(layout)
+                .setPositiveButton("Save", (dialog, which) -> {
+                    String alias = etAlias.getText().toString().trim();
+                    if (alias.isEmpty()) {
+                        Toast.makeText(this, "Please enter a nickname", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    aliasStore.setAlias(merchant, alias);
+                    loadSettingsNicknames();
+                    Toast.makeText(this, "Nickname saved", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
     private void showAddNicknameDialog() {
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
@@ -2535,21 +2833,64 @@ public class HomeActivity extends AppCompatActivity {
                 .show();
     }
 
+    private List<Map<String, Object>> loadCategoryDefs() {
+        String json = settingsPrefs.getString("category_defs", null);
+        if (json == null) {
+            String[] defaultNames = {
+                    "Food & Dining", "Shopping", "Subscriptions", "Transportation",
+                    "Bills & Utilities", "Entertainment", "Health", "Interac Sent",
+                    "Interac Received", "Transfers", "Travel", "Other"
+            };
+            int[] defaultColors = {
+                    0xFF29B6F6, 0xFFFFA726, 0xFF8E24AA, 0xFFE53935,
+                    0xFF5C6BC0, 0xFF26A69A, 0xFF4CAF50, 0xFFEF5350,
+                    0xFF66BB6A, 0xFF42A5F5, 0xFFFF7043, 0xFF757575
+            };
+            List<Map<String, Object>> defaults = new ArrayList<>();
+            for (int i = 0; i < defaultNames.length; i++) {
+                Map<String, Object> m = new HashMap<>();
+                m.put("name", defaultNames[i]);
+                m.put("color", defaultColors[i]);
+                defaults.add(m);
+            }
+            saveCategoryDefs(defaults);
+            return defaults;
+        }
+        List<Map<String, Object>> result = new ArrayList<>();
+        try {
+            JSONArray arr = new JSONArray(json);
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.getJSONObject(i);
+                Map<String, Object> m = new HashMap<>();
+                m.put("name", o.getString("name"));
+                m.put("color", o.getInt("color"));
+                result.add(m);
+            }
+        } catch (Exception ignored) {}
+        return result;
+    }
+
+    private void saveCategoryDefs(List<Map<String, Object>> defs) {
+        try {
+            JSONArray arr = new JSONArray();
+            for (Map<String, Object> m : defs) {
+                JSONObject o = new JSONObject();
+                o.put("name", m.get("name"));
+                o.put("color", m.get("color"));
+                arr.put(o);
+            }
+            settingsPrefs.edit().putString("category_defs", arr.toString()).apply();
+        } catch (Exception ignored) {}
+    }
+
     private void loadSettingsCategories() {
         LinearLayout list = findViewById(R.id.container_categories_list);
         list.removeAllViews();
-        String[] cats = {
-                "Food & Dining", "Shopping", "Subscriptions", "Transportation",
-                "Bills & Utilities", "Entertainment", "Health", "Interac Sent",
-                "Interac Received", "Transfers", "Travel", "Other"
-        };
-        int[] colors = {
-                0xFF29B6F6, 0xFFFFA726, 0xFF8E24AA, 0xFFE53935,
-                0xFF5C6BC0, 0xFF26A69A, 0xFF4CAF50, 0xFFEF5350,
-                0xFF66BB6A, 0xFF42A5F5, 0xFFFF7043, 0xFF757575
-        };
-        for (int i = 0; i < cats.length; i++) {
+        List<Map<String, Object>> defs = loadCategoryDefs();
+        for (int i = 0; i < defs.size(); i++) {
             final int idx = i;
+            final String catName = (String) defs.get(i).get("name");
+            final int catColor = (int) defs.get(i).get("color");
             CardView card = new CardView(this);
             card.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(56)));
             card.setCardBackgroundColor(0xFFFFFFFF);
@@ -2559,7 +2900,7 @@ public class HomeActivity extends AppCompatActivity {
             card.setClickable(true);
             card.setFocusable(true);
             card.setForeground(ContextCompat.getDrawable(this, R.drawable.input_outline));
-            card.setOnClickListener(v -> openSettingsEditCategory(cats[idx], colors[idx]));
+            card.setOnClickListener(v -> openSettingsEditCategory(catName, catColor, idx));
             LinearLayout row = new LinearLayout(this);
             row.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
             row.setOrientation(LinearLayout.HORIZONTAL);
@@ -2571,13 +2912,13 @@ public class HomeActivity extends AppCompatActivity {
             Bitmap bmp = Bitmap.createBitmap(dotSize, dotSize, Bitmap.Config.ARGB_8888);
             Canvas c = new Canvas(bmp);
             Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-            p.setColor(colors[idx]);
+            p.setColor(catColor);
             c.drawCircle(dotSize / 2f, dotSize / 2f, dotSize / 2f, p);
             dot.setImageBitmap(bmp);
             row.addView(dot);
             TextView tvName = new TextView(this);
             tvName.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-            tvName.setText(cats[idx]);
+            tvName.setText(catName);
             tvName.setTextSize(15);
             tvName.setTextColor(0xFF000000);
             tvName.setPadding(dp(12), 0, 0, 0);
@@ -2590,13 +2931,20 @@ public class HomeActivity extends AppCompatActivity {
             card.addView(row);
             list.addView(card);
         }
+        findViewById(R.id.btn_add_category).setOnClickListener(v -> {
+            openSettingsEditCategory("", 0xFF29B6F6, -1);
+        });
     }
 
-    private void openSettingsEditCategory(String name, int color) {
+    private int editingCategoryIndex = -1;
+
+    private void openSettingsEditCategory(String name, int color, int index) {
         editingCategoryName = name;
         editingCategoryColor = color;
+        editingCategoryIndex = index;
         ((EditText) findViewById(R.id.et_edit_category_name)).setText(name);
         highlightSettingsColorInPicker(color);
+        findViewById(R.id.btn_edit_category_delete).setVisibility(index == -1 ? View.GONE : View.VISIBLE);
         showSettingsScreen(containerSettingsEditCategory);
     }
 
@@ -2607,9 +2955,39 @@ public class HomeActivity extends AppCompatActivity {
                 Toast.makeText(this, "Category name cannot be empty", Toast.LENGTH_SHORT).show();
                 return;
             }
-            Toast.makeText(this, "Category updated to: " + newName, Toast.LENGTH_SHORT).show();
+            List<Map<String, Object>> defs = loadCategoryDefs();
+            if (editingCategoryIndex >= 0 && editingCategoryIndex < defs.size()) {
+                defs.get(editingCategoryIndex).put("name", newName);
+                defs.get(editingCategoryIndex).put("color", editingCategoryColor);
+            } else {
+                Map<String, Object> m = new HashMap<>();
+                m.put("name", newName);
+                m.put("color", editingCategoryColor);
+                defs.add(m);
+            }
+            saveCategoryDefs(defs);
+            Toast.makeText(this, "Category saved", Toast.LENGTH_SHORT).show();
             loadSettingsCategories();
             showSettingsScreen(containerSettingsCategories);
+        });
+        findViewById(R.id.btn_edit_category_delete).setOnClickListener(v -> {
+            String catName = ((EditText) findViewById(R.id.et_edit_category_name)).getText().toString().trim();
+            new AlertDialog.Builder(this)
+                    .setTitle("Delete Category")
+                    .setMessage("Delete \"" + catName + "\"? Transactions in this category will be moved to \"Other\".")
+                    .setPositiveButton("Delete", (dialog, which) -> {
+                        List<Map<String, Object>> defs = loadCategoryDefs();
+                        if (editingCategoryIndex >= 0 && editingCategoryIndex < defs.size()) {
+                            defs.remove(editingCategoryIndex);
+                            saveCategoryDefs(defs);
+                            Toast.makeText(this, "Category deleted", Toast.LENGTH_SHORT).show();
+                            editingCategoryIndex = -1;
+                            loadSettingsCategories();
+                            showSettingsScreen(containerSettingsCategories);
+                        }
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
         });
     }
 
@@ -2708,95 +3086,290 @@ public class HomeActivity extends AppCompatActivity {
     }
 
     private void loadSettingsMailScanning() {
-        LinearLayout list = findViewById(R.id.container_senders_list);
-        list.removeAllViews();
-        if (trackedSenders.isEmpty()) {
-            trackedSenders.add("noreply@amazon.com");
-            trackedSenders.add("payment@netflix.com");
-            trackedSenders.add("no-reply@spotify.com");
-            trackedSenders.add("billing@apple.com");
-        }
-        for (String sender : trackedSenders) {
-            list.addView(createSenderCard(sender));
-        }
-        findViewById(R.id.btn_add_sender).setOnClickListener(v -> showAddSenderDialog());
-    }
+        SwitchCompat switchEnable = findViewById(R.id.switch_mail_scanning_enable);
+        SwitchCompat switchManual = findViewById(R.id.switch_manual_scan_only);
+        LinearLayout manualScanBtnContainer = findViewById(R.id.container_manual_scan_button);
 
-    private View createSenderCard(String sender) {
-        CardView card = new CardView(this);
-        card.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(56)));
-        card.setCardBackgroundColor(0xFFFFFFFF);
-        card.setRadius(dp(16));
-        card.setCardElevation(1);
-        ((LinearLayout.LayoutParams) card.getLayoutParams()).bottomMargin = dp(8);
-        LinearLayout row = new LinearLayout(this);
-        row.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(16), dp(8), dp(16), dp(8));
-        ImageView icon = new ImageView(this);
-        int size = dp(32);
-        icon.setLayoutParams(new LinearLayout.LayoutParams(size, size));
-        Bitmap bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
-        Canvas c = new Canvas(bmp);
-        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        p.setColor(0xFFF9A84D);
-        c.drawCircle(size / 2f, size / 2f, size / 2f, p);
-        Paint tp = new Paint(Paint.ANTI_ALIAS_FLAG);
-        tp.setColor(0xFFFFFFFF);
-        tp.setTextSize(size * 0.35f);
-        tp.setTextAlign(Paint.Align.CENTER);
-        tp.setFakeBoldText(true);
-        float y = -(tp.descent() + tp.ascent()) / 2f;
-        c.drawText("@", size / 2f, size / 2f + y, tp);
-        icon.setImageBitmap(bmp);
-        row.addView(icon);
-        TextView tvSender = new TextView(this);
-        tvSender.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        tvSender.setText(sender);
-        tvSender.setTextSize(14);
-        tvSender.setTextColor(0xFF000000);
-        tvSender.setPadding(dp(12), 0, 0, 0);
-        row.addView(tvSender);
-        TextView btnRemove = new TextView(this);
-        btnRemove.setText("Remove");
-        btnRemove.setTextSize(12);
-        btnRemove.setTextColor(0xFFE53935);
-        btnRemove.setPadding(dp(8), dp(4), dp(8), dp(4));
-        btnRemove.setClickable(true);
-        btnRemove.setFocusable(true);
-        btnRemove.setOnClickListener(v -> {
-            trackedSenders.remove(sender);
+        boolean scanning = settingsPrefs.getBoolean("email_scanning", true);
+        boolean manualOnly = settingsPrefs.getBoolean("manual_scan_only", false);
+        String lastScanTime = settingsPrefs.getString("last_scan_time", null);
+
+        switchEnable.setChecked(scanning);
+        switchManual.setChecked(manualOnly);
+
+        manualScanBtnContainer.setVisibility(manualOnly ? View.VISIBLE : View.GONE);
+        TextView btnManualScan = findViewById(R.id.btn_run_manual_scan);
+        android.graphics.drawable.GradientDrawable msBg = new android.graphics.drawable.GradientDrawable();
+        msBg.setColor(0xFFF9A84D);
+        msBg.setCornerRadius(dp(24));
+        btnManualScan.setBackground(msBg);
+        btnManualScan.setOnClickListener(v -> runManualScan());
+
+        setMailScanningStatus(scanning);
+
+        switchEnable.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            settingsPrefs.edit().putBoolean("email_scanning", isChecked).apply();
+            if (isChecked) {
+                String pausedAt = settingsPrefs.getString("paused_at", null);
+                if (pausedAt != null) {
+                    savePauseRange(pausedAt, String.valueOf(System.currentTimeMillis()));
+                    settingsPrefs.edit().remove("paused_at").apply();
+                }
+            } else {
+                settingsPrefs.edit().putString("paused_at", String.valueOf(System.currentTimeMillis())).apply();
+            }
+            setMailScanningStatus(isChecked);
             loadSettingsMailScanning();
-            Toast.makeText(this, "Sender removed", Toast.LENGTH_SHORT).show();
         });
-        row.addView(btnRemove);
-        card.addView(row);
-        return card;
+
+        switchManual.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            settingsPrefs.edit().putBoolean("manual_scan_only", isChecked).apply();
+            manualScanBtnContainer.setVisibility(isChecked ? View.VISIBLE : View.GONE);
+        });
+
+        updateLastScanInfo(lastScanTime, !scanning);
+        updateTotalEmailsScanned();
+        loadKeywordTags();
+        findViewById(R.id.btn_add_keyword).setOnClickListener(v -> showAddKeywordDialog());
+
+        TextView subtitle = findViewById(R.id.tv_mail_scanning_subtitle);
+        SpannableStringBuilder ss = new SpannableStringBuilder("Control when? and how? your Gmail is read");
+        ss.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD), 8, 13, SpannableStringBuilder.SPAN_EXCLUSIVE_EXCLUSIVE);
+        ss.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD), 18, 22, SpannableStringBuilder.SPAN_EXCLUSIVE_EXCLUSIVE);
+        ss.setSpan(new android.text.style.ForegroundColorSpan(0xFFF9575C), 28, 33, SpannableStringBuilder.SPAN_EXCLUSIVE_EXCLUSIVE);
+        subtitle.setText(ss);
     }
 
-    private void showAddSenderDialog() {
+    private void setMailScanningStatus(boolean enabled) {
+        TextView tvStatus = findViewById(R.id.tv_mail_scanning_status);
+        LinearLayout alert = findViewById(R.id.container_mail_scanning_alert);
+        TextView tvAlertBody = findViewById(R.id.tv_alert_body);
+        if (enabled) {
+            tvStatus.setText("Active \u2014 scanning new emails");
+            tvStatus.setTextColor(0xFF2B9348);
+            alert.setVisibility(View.GONE);
+        } else {
+            String pausedAt = settingsPrefs.getString("paused_at", null);
+            String pausedDisplay;
+            if (pausedAt != null) {
+                try {
+                    long pts = Long.parseLong(pausedAt);
+                    pausedDisplay = new SimpleDateFormat("MMM dd, yyyy 'at' HH:mm", Locale.US).format(new Date(pts));
+                } catch (Exception e) {
+                    pausedDisplay = "recently";
+                }
+            } else {
+                pausedDisplay = "recently";
+            }
+            tvStatus.setText("Paused since " + pausedDisplay);
+            tvStatus.setTextColor(0xFF888888);
+            tvAlertBody.setText("Transactions from " + pausedDisplay + " \u2013 today will not be imported when you re-enable. This gap is intentional and permanent.");
+            alert.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void updateLastScanInfo(String lastScanTime, boolean isPaused) {
+        TextView tvValue = findViewById(R.id.tv_last_scan_value);
+        TextView badge = findViewById(R.id.badge_scan_status);
+        android.graphics.drawable.GradientDrawable badgeBg = new android.graphics.drawable.GradientDrawable();
+        badgeBg.setCornerRadius(dp(20));
+        if (isPaused) {
+            badge.setText("paused now");
+            badge.setTextColor(0xFFBF8C00);
+            badgeBg.setColor(0xFFFFF3E0);
+        } else {
+            badge.setText("active");
+            badge.setTextColor(0xFF2B9348);
+            badgeBg.setColor(0xFFE8F5E9);
+        }
+        badge.setBackground(badgeBg);
+        if (lastScanTime != null) {
+            tvValue.setText(lastScanTime);
+        } else {
+            tvValue.setText("No scans yet");
+        }
+    }
+
+    private void updateTotalEmailsScanned() {
+        TextView tvCount = findViewById(R.id.tv_total_emails_scanned);
+        int count = 0;
+        if (allTransactions != null) {
+            for (Transaction t : allTransactions) {
+                if (t.getMessageId() != null && !t.getMessageId().startsWith("manual_")) {
+                    count++;
+                }
+            }
+        }
+        tvCount.setText(String.valueOf(count));
+    }
+
+    private void savePauseRange(String fromStr, String untilStr) {
+        long from = Long.parseLong(fromStr);
+        long until = Long.parseLong(untilStr);
+        String json = settingsPrefs.getString("paused_ranges", "[]");
+        try {
+            JSONArray arr = new JSONArray(json);
+            JSONObject range = new JSONObject();
+            range.put("from", from);
+            range.put("until", until);
+            arr.put(range);
+            settingsPrefs.edit().putString("paused_ranges", arr.toString()).apply();
+        } catch (Exception ignored) {}
+    }
+
+    private boolean isInPausedRange(long dateMillis) {
+        String json = settingsPrefs.getString("paused_ranges", "[]");
+        try {
+            JSONArray arr = new JSONArray(json);
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject range = arr.getJSONObject(i);
+                long from = range.getLong("from");
+                long until = range.getLong("until");
+                if (dateMillis >= from && dateMillis <= until) {
+                    return true;
+                }
+            }
+        } catch (Exception ignored) {}
+        String pausedAt = settingsPrefs.getString("paused_at", null);
+        if (pausedAt != null) {
+            long paused = Long.parseLong(pausedAt);
+            if (dateMillis >= paused) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void runManualScan() {
+        settingsPrefs.edit()
+                .remove("paused_at")
+                .putString("paused_ranges", "[]")
+                .putString("last_scan_time", new SimpleDateFormat("MMM dd, yyyy 'at' HH:mm", Locale.US).format(new Date()))
+                .apply();
+        Toast.makeText(this, "Manual scan started \u2014 fetching all emails...", Toast.LENGTH_SHORT).show();
+        loadSettingsMailScanning();
+        fetchAndShowTransactions();
+    }
+
+    private void loadKeywordTags() {
+        LinearLayout container = findViewById(R.id.container_keywords_tags);
+        container.removeAllViews();
+
+        Set<String> keywords = new LinkedHashSet<>();
+        keywords.add("receipt");
+        keywords.add("order confirmed");
+        keywords.add("e-transfer");
+        keywords.add("payment");
+        keywords.add("charged");
+        keywords.add("your order");
+        keywords.add("purchase");
+        keywords.add("invoice");
+
+        String customJson = settingsPrefs.getString("scan_keywords_extra", "[]");
+        try {
+            JSONArray arr = new JSONArray(customJson);
+            for (int i = 0; i < arr.length(); i++) {
+                keywords.add(arr.getString(i).toLowerCase());
+            }
+        } catch (Exception ignored) {}
+
+        LinearLayout currentRow = null;
+        int rowWidth = dp(320);
+        int used = 0;
+
+        for (String kw : keywords) {
+            TextView tag = new TextView(this);
+            tag.setText(kw);
+            tag.setTextSize(14);
+            tag.setTextColor(0xFF8D6E00);
+            tag.setPadding(dp(14), dp(8), dp(14), dp(8));
+            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+            bg.setColor(0xFFFFF3E0);
+            bg.setCornerRadius(dp(24));
+            tag.setBackground(bg);
+            tag.setClickable(true);
+            tag.setFocusable(true);
+            tag.setOnClickListener(v -> showDeleteKeywordDialog(kw));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.setMargins(0, 0, dp(8), dp(8));
+
+            int tw = (int) (kw.length() * dp(10)) + dp(28);
+            if (currentRow == null || used + tw > rowWidth) {
+                currentRow = new LinearLayout(this);
+                currentRow.setLayoutParams(new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                currentRow.setOrientation(LinearLayout.HORIZONTAL);
+                container.addView(currentRow);
+                used = 0;
+            }
+            currentRow.addView(tag, lp);
+            used += tw + dp(8);
+        }
+    }
+
+    private void showDeleteKeywordDialog(String keyword) {
+        new AlertDialog.Builder(this)
+                .setTitle("Remove Keyword")
+                .setMessage("Remove \"" + keyword + "\" from the keyword list?")
+                .setPositiveButton("Remove", (dialog, which) -> {
+                    String json = settingsPrefs.getString("scan_keywords_extra", "[]");
+                    try {
+                        JSONArray arr = new JSONArray(json);
+                        JSONArray newArr = new JSONArray();
+                        for (int i = 0; i < arr.length(); i++) {
+                            if (!arr.getString(i).equalsIgnoreCase(keyword)) {
+                                newArr.put(arr.getString(i));
+                            }
+                        }
+                        settingsPrefs.edit().putString("scan_keywords_extra", newArr.toString()).apply();
+                    } catch (Exception ignored) {}
+                    loadKeywordTags();
+                    Toast.makeText(this, "Keyword removed", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void showAddKeywordDialog() {
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(dp(24), dp(16), dp(24), dp(16));
-        final EditText etSender = new EditText(this);
-        etSender.setHint("sender@email.com");
-        etSender.setTextSize(14);
-        etSender.setBackgroundResource(R.drawable.input_outline);
-        etSender.setPadding(dp(16), dp(12), dp(16), dp(12));
-        layout.addView(etSender);
+        final EditText etKeyword = new EditText(this);
+        etKeyword.setHint("e.g. subscription");
+        etKeyword.setTextSize(14);
+        etKeyword.setBackgroundResource(R.drawable.input_outline);
+        etKeyword.setPadding(dp(16), dp(12), dp(16), dp(12));
+        layout.addView(etKeyword);
         new AlertDialog.Builder(this)
-                .setTitle("Add Sender")
+                .setTitle("Add Keyword")
                 .setView(layout)
                 .setPositiveButton("Add", (dialog, which) -> {
-                    String sender = etSender.getText().toString().trim();
-                    if (sender.isEmpty()) {
-                        Toast.makeText(this, "Please enter an email", Toast.LENGTH_SHORT).show();
+                    String kw = etKeyword.getText().toString().trim().toLowerCase();
+                    if (kw.isEmpty()) {
+                        Toast.makeText(this, "Please enter a keyword", Toast.LENGTH_SHORT).show();
                         return;
                     }
-                    trackedSenders.add(sender);
-                    loadSettingsMailScanning();
-                    Toast.makeText(this, "Sender added", Toast.LENGTH_SHORT).show();
+                    String json = settingsPrefs.getString("scan_keywords_extra", "[]");
+                    try {
+                        JSONArray arr = new JSONArray(json);
+                        for (int i = 0; i < arr.length(); i++) {
+                            if (arr.getString(i).equalsIgnoreCase(kw)) {
+                                Toast.makeText(this, "Keyword already added", Toast.LENGTH_SHORT).show();
+                                return;
+                            }
+                        }
+                        arr.put(kw);
+                        settingsPrefs.edit().putString("scan_keywords_extra", arr.toString()).apply();
+                    } catch (Exception e) {
+                        try {
+                            JSONArray arr = new JSONArray();
+                            arr.put(kw);
+                            settingsPrefs.edit().putString("scan_keywords_extra", arr.toString()).apply();
+                        } catch (Exception ignored) {}
+                    }
+                    loadKeywordTags();
+                    Toast.makeText(this, "Keyword added", Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
