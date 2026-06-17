@@ -39,6 +39,7 @@ import com.spotmydime.data.TransactionOverrideStore;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -93,7 +94,6 @@ public class HomeActivity extends AppCompatActivity {
     private TextView tvInsightsNet;
     private TextView tvInsightsNetLabel;
     private TextView tvInsightsTrend;
-    private FrameLayout insightsChartContainer;
     private TextView tvMicroIncomeVal;
     private TextView tvMicroIncomeTrend;
     private TextView tvMicroExpenseVal;
@@ -115,6 +115,9 @@ public class HomeActivity extends AppCompatActivity {
     private TextView tvTrendsIndicator;
     private FrameLayout chartTrendsBar;
     private TextView tvTrendsKeyInsight;
+
+    private int selectedInsightMonth = Calendar.getInstance().get(Calendar.MONTH);
+    private int selectedInsightYear = Calendar.getInstance().get(Calendar.YEAR);
 
     private int selectedTab = 0;
     private int selectedInsightSubTab = 0;
@@ -165,7 +168,6 @@ public class HomeActivity extends AppCompatActivity {
         tvInsightsNet = findViewById(R.id.tv_insights_net);
         tvInsightsNetLabel = findViewById(R.id.tv_insights_net_label);
         tvInsightsTrend = findViewById(R.id.tv_insights_trend);
-        insightsChartContainer = findViewById(R.id.insights_chart_container);
         tvMicroIncomeVal = findViewById(R.id.tv_micro_income_val);
         tvMicroIncomeTrend = findViewById(R.id.tv_micro_income_trend);
         tvMicroExpenseVal = findViewById(R.id.tv_micro_expense_val);
@@ -187,6 +189,10 @@ public class HomeActivity extends AppCompatActivity {
         tvTrendsIndicator = findViewById(R.id.tv_trends_indicator);
         chartTrendsBar = findViewById(R.id.chart_trends_bar);
         tvTrendsKeyInsight = findViewById(R.id.tv_trends_key_insight);
+
+        findViewById(R.id.tv_overview_dropdown).setOnClickListener(v -> showMonthPickerDialog("overview"));
+        findViewById(R.id.tv_spending_dropdown).setOnClickListener(v -> showMonthPickerDialog("spending"));
+        findViewById(R.id.tv_income_dropdown).setOnClickListener(v -> showMonthPickerDialog("income"));
 
         tvTotalAmount = findViewById(R.id.tv_total_amount);
         tvTrend = findViewById(R.id.tv_trend);
@@ -336,19 +342,85 @@ public class HomeActivity extends AppCompatActivity {
         return (int) (dp * getResources().getDisplayMetrics().density + 0.5f);
     }
 
+    private final String[] monthNames = {
+            "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December"
+    };
+
+    private void showMonthPickerDialog(final String source) {
+        int[] currentMonth = {selectedInsightMonth};
+        int[] currentYear = {selectedInsightYear};
+        String[] items = new String[12];
+        for (int i = 0; i < 12; i++) items[i] = monthNames[i];
+        new AlertDialog.Builder(this)
+                .setTitle("Select Month")
+                .setSingleChoiceItems(items, selectedInsightMonth, (dialog, which) -> {
+                    selectedInsightMonth = which;
+                    selectedInsightYear = currentYear[0];
+                    String label = monthNames[which] + " " + selectedInsightYear + " ▼";
+                    int id = source.equals("overview") ? R.id.tv_overview_dropdown
+                            : source.equals("spending") ? R.id.tv_spending_dropdown
+                            : R.id.tv_income_dropdown;
+                    ((TextView) findViewById(id)).setText(label);
+                    renderInsightsSubTab(selectedInsightSubTab);
+                    dialog.dismiss();
+                })
+                .setNeutralButton("← Prev Year", (dialog, which) -> {
+                    currentYear[0]--;
+                    dialog.dismiss();
+                    showMonthPickerDialog(source);
+                })
+                .setPositiveButton("Next Year →", (dialog, which) -> {
+                    currentYear[0]++;
+                    dialog.dismiss();
+                    showMonthPickerDialog(source);
+                })
+                .show();
+    }
+
+    private List<Transaction> getTransactionsForMonth(int year, int month) {
+        if (allTransactions == null) return new ArrayList<>();
+        List<Transaction> result = new ArrayList<>();
+        Calendar cal = Calendar.getInstance();
+        for (Transaction t : allTransactions) {
+            cal.setTimeInMillis(t.getDateMillis());
+            if (cal.get(Calendar.YEAR) == year && cal.get(Calendar.MONTH) == month) {
+                result.add(t);
+            }
+        }
+        return result;
+    }
+
+    private String formatMonthYear(int year, int month) {
+        return monthNames[month] + " " + year;
+    }
+
     // ── SCREEN 1: OVERVIEW ──
 
     private void populateOverview() {
         if (allTransactions == null) return;
 
+        List<Transaction> monthTxs = getTransactionsForMonth(selectedInsightYear, selectedInsightMonth);
+
         double totalIn = 0, totalOut = 0;
-        for (Transaction t : allTransactions) {
+        for (Transaction t : monthTxs) {
             if (t.getType() == Transaction.Type.INCOMING) totalIn += t.getAmount();
             else totalOut += t.getAmount();
         }
         double netCashFlow = totalIn - totalOut;
-        double priorNet = netCashFlow * 1.12;
-        double pctChange = priorNet > 0 ? ((netCashFlow - priorNet) / priorNet) * 100 : 0;
+
+        // Previous month comparison
+        int prevMonth = selectedInsightMonth == 0 ? 11 : selectedInsightMonth - 1;
+        int prevYear = selectedInsightMonth == 0 ? selectedInsightYear - 1 : selectedInsightYear;
+        List<Transaction> prevTxs = getTransactionsForMonth(prevYear, prevMonth);
+        double prevIn = 0, prevOut = 0;
+        for (Transaction t : prevTxs) {
+            if (t.getType() == Transaction.Type.INCOMING) prevIn += t.getAmount();
+            else prevOut += t.getAmount();
+        }
+        double prevNet = prevIn - prevOut;
+
+        double pctChange = prevNet != 0 ? ((netCashFlow - prevNet) / Math.abs(prevNet)) * 100 : 0;
         double savingsRate = totalIn > 0 ? (netCashFlow / totalIn) * 100 : 0;
 
         // Main card
@@ -358,69 +430,39 @@ public class HomeActivity extends AppCompatActivity {
         tvInsightsTrend.setText(trendArrow + " " + String.format("%.0f", Math.abs(pctChange)) + "% vs last month");
         tvInsightsTrend.setTextColor(pctChange >= 0 ? 0xFF2B9348 : 0xFFE53935);
 
-        // Donut chart in the container
-        final double donutIn = totalIn;
-        final double donutOut = totalOut;
-        insightsChartContainer.removeAllViews();
-        View donutView = new View(this) {
-            private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            private final Paint outlinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            @Override
-            protected void onDraw(Canvas canvas) {
-                super.onDraw(canvas);
-                float w = getWidth(), h = getHeight();
-                float cx = w / 2f, cy = h / 2f, r = Math.min(cx, cy) - 4;
-                float sweep = 0;
-                if (donutIn + donutOut > 0) {
-                    sweep = (float) (donutIn / (donutIn + donutOut) * 360);
-                }
-                // Outline ring
-                outlinePaint.setStyle(Paint.Style.STROKE);
-                outlinePaint.setStrokeWidth(3);
-                outlinePaint.setColor(0xFF000000);
-                canvas.drawCircle(cx, cy, r, outlinePaint);
-                // Filled segment (dusty rose)
-                if (sweep > 0) {
-                    paint.setColor(0xFFD4A373);
-                    canvas.drawArc(cx - r, cy - r, cx + r, cy + r, -90, sweep, true, paint);
-                }
-                // Remaining (transparent, just outline)
-                paint.setColor(0x00000000);
-                canvas.drawArc(cx - r, cy - r, cx + r, cy + r, -90 + sweep, 360 - sweep, true, paint);
-                // Inner white circle for donut hole
-                paint.setColor(0xFFFFFFFF);
-                canvas.drawCircle(cx, cy, r * 0.5f, paint);
-                // Inner circle outline
-                outlinePaint.setColor(0xFF000000);
-                outlinePaint.setStrokeWidth(2);
-                canvas.drawCircle(cx, cy, r * 0.5f, outlinePaint);
-            }
-        };
-        donutView.setLayoutParams(new FrameLayout.LayoutParams(dp(90), dp(90)));
-        insightsChartContainer.addView(donutView);
-
-        // Micro cards
-        double priorIn = totalIn * 1.08;
-        double trendIn = priorIn > 0 ? ((totalIn - priorIn) / priorIn) * 100 : 0;
+        // Micro cards — dynamic trends
+        double pctIn = prevIn != 0 ? ((totalIn - prevIn) / Math.abs(prevIn)) * 100 : 0;
         tvMicroIncomeVal.setText("$" + String.format("%.2f", totalIn));
-        tvMicroIncomeTrend.setText("↑ " + String.format("%.0f", Math.abs(trendIn)) + "%");
+        String inArrow = pctIn >= 0 ? "↑" : "↓";
+        tvMicroIncomeTrend.setText(inArrow + " " + String.format("%.0f", Math.abs(pctIn)) + "%");
+        tvMicroIncomeTrend.setTextColor(pctIn >= 0 ? 0xFF2B9348 : 0xFFE53935);
 
-        double priorOut = totalOut * 1.15;
-        double trendOut = priorOut > 0 ? ((totalOut - priorOut) / priorOut) * 100 : 0;
+        double pctOut = prevOut != 0 ? ((totalOut - prevOut) / Math.abs(prevOut)) * 100 : 0;
         tvMicroExpenseVal.setText("$" + String.format("%.2f", totalOut));
-        tvMicroExpenseTrend.setText("↑ " + String.format("%.0f", Math.abs(trendOut)) + "%");
+        String outArrow = pctOut <= 0 ? "↓" : "↑";
+        tvMicroExpenseTrend.setText(outArrow + " " + String.format("%.0f", Math.abs(pctOut)) + "%");
+        // Spending down = green, up = red
+        tvMicroExpenseTrend.setTextColor(pctOut <= 0 ? 0xFF2B9348 : 0xFFE53935);
 
         tvMicroSavingsVal.setText(String.format("%.0f", savingsRate) + "%");
-        double trendSavings = savingsRate * 1.05;
-        double pctSavings = trendSavings > 0 ? ((savingsRate - trendSavings) / trendSavings) * 100 : 0;
-        tvMicroSavingsTrend.setText("↑ " + String.format("%.0f", Math.abs(pctSavings)) + "%");
+        double prevRate = prevIn > 0 ? ((prevIn - prevOut) / prevIn) * 100 : 0;
+        double pctSavingsTrend = prevRate != 0 ? ((savingsRate - prevRate) / Math.abs(prevRate)) * 100 : 0;
+        String svArrow = pctSavingsTrend >= 0 ? "↑" : "↓";
+        tvMicroSavingsTrend.setText(svArrow + " " + String.format("%.0f", Math.abs(pctSavingsTrend)) + "%");
+        tvMicroSavingsTrend.setTextColor(pctSavingsTrend >= 0 ? 0xFF2B9348 : 0xFFE53935);
 
-        // Insights for you
+        // Update dropdown label
+        ((TextView) findViewById(R.id.tv_overview_dropdown)).setText(formatMonthYear(selectedInsightYear, selectedInsightMonth) + " ▼");
+
+        // Dynamic AI Insights
         containerInsightsForYou.removeAllViews();
-        String[][] insights = generateInsights(totalIn, totalOut, allTransactions);
-        for (String[] insight : insights) {
+        List<String> insights = generateInsights(totalIn, totalOut, monthTxs);
+        if (insights.isEmpty()) {
+            insights.add("No spending data for " + formatMonthYear(selectedInsightYear, selectedInsightMonth) + ".");
+        }
+        for (String insight : insights) {
             TextView tv = new TextView(this);
-            tv.setText("• " + insight[0]);
+            tv.setText("• " + insight);
             tv.setTextSize(13);
             tv.setTextColor(0xFF000000);
             tv.setLineSpacing(8, 1);
@@ -432,7 +474,8 @@ public class HomeActivity extends AppCompatActivity {
         }
     }
 
-    private String[][] generateInsights(double totalIn, double totalOut, List<Transaction> txs) {
+    private List<String> generateInsights(double totalIn, double totalOut, List<Transaction> txs) {
+        List<String> results = new ArrayList<>();
         Map<String, Double> catTotals = new HashMap<>();
         for (Transaction t : txs) {
             if (t.getType() == Transaction.Type.OUTGOING) {
@@ -442,24 +485,46 @@ public class HomeActivity extends AppCompatActivity {
         }
         List<Map.Entry<String, Double>> sorted = new ArrayList<>(catTotals.entrySet());
         sorted.sort((a, b) -> Double.compare(b.getValue(), a.getValue()));
-        String dining = "$0";
-        String subs = "$0";
-        String groceries = "$0";
-        for (Map.Entry<String, Double> e : sorted) {
-            String cat = e.getKey().toLowerCase();
-            if (cat.contains("dining") || cat.contains("food")) {
-                dining = "$" + String.format("%.0f", e.getValue());
-            } else if (cat.contains("subscription")) {
-                subs = "$" + String.format("%.0f", e.getValue());
-            } else if (cat.contains("grocer") || cat.contains("shopping")) {
-                groceries = "$" + String.format("%.0f", e.getValue());
+
+        if (sorted.isEmpty() && totalIn == 0) return results;
+
+        // Warning: largest category
+        if (!sorted.isEmpty()) {
+            Map.Entry<String, Double> top = sorted.get(0);
+            double pctOfTotal = totalOut > 0 ? (top.getValue() / totalOut) * 100 : 0;
+            if (pctOfTotal > 40) {
+                results.add("⚠ Warning: " + top.getKey() + " accounts for " + String.format("%.0f", pctOfTotal) + "% of your spending this month.");
             }
         }
-        return new String[][]{
-                {"You spent 22% more on Dining out."},
-                {"Subscriptions increased by 15% this month."},
-                {"Groceries spending is within budget for this month."}
-        };
+
+        // Tip: savings rate
+        double savingsRate = totalIn > 0 ? ((totalIn - totalOut) / totalIn) * 100 : 0;
+        if (savingsRate > 20) {
+            results.add("💡 Tip: Great savings rate of " + String.format("%.0f", savingsRate) + "%! Consider investing the excess.");
+        } else if (savingsRate < 5 && totalIn > 0) {
+            results.add("💡 Tip: Savings rate is low (" + String.format("%.0f", savingsRate) + "%). Try reducing non-essential spending.");
+        }
+
+        // Forecast: recurring patterns
+        Set<String> recurringVendors = new HashSet<>();
+        Map<String, Integer> vendorMonths = new HashMap<>();
+        for (Transaction t : allTransactions) {
+            String key = t.getMerchant() != null ? t.getMerchant().toLowerCase() : "";
+            if (key.isEmpty()) continue;
+            Calendar cal = Calendar.getInstance();
+            cal.setTimeInMillis(t.getDateMillis());
+            int ym = cal.get(Calendar.YEAR) * 12 + cal.get(Calendar.MONTH);
+            if (vendorMonths.containsKey(key)) {
+                int prevYm = vendorMonths.get(key);
+                if (ym - prevYm == 1) recurringVendors.add(key);
+            }
+            vendorMonths.put(key, ym);
+        }
+        if (!recurringVendors.isEmpty()) {
+            results.add("📊 Forecast: " + recurringVendors.size() + " recurring merchants detected. Budget accordingly for next month.");
+        }
+
+        return results;
     }
 
     // ── SCREEN 2: SPENDING ──
@@ -467,24 +532,61 @@ public class HomeActivity extends AppCompatActivity {
     private void populateSpending() {
         if (allTransactions == null) return;
 
+        List<Transaction> monthTxs = getTransactionsForMonth(selectedInsightYear, selectedInsightMonth);
+
         double totalOut = 0;
-        for (Transaction t : allTransactions) {
+        for (Transaction t : monthTxs) {
             if (t.getType() == Transaction.Type.OUTGOING) totalOut += t.getAmount();
         }
-        double priorOut = totalOut * 1.12;
-        double pctChange = priorOut > 0 ? ((totalOut - priorOut) / priorOut) * 100 : 0;
+
+        // Previous month comparison
+        int prevMonth = selectedInsightMonth == 0 ? 11 : selectedInsightMonth - 1;
+        int prevYear = selectedInsightMonth == 0 ? selectedInsightYear - 1 : selectedInsightYear;
+        List<Transaction> prevTxs = getTransactionsForMonth(prevYear, prevMonth);
+        double prevOut = 0;
+        for (Transaction t : prevTxs) {
+            if (t.getType() == Transaction.Type.OUTGOING) prevOut += t.getAmount();
+        }
+
+        double pctChange = prevOut != 0 ? ((totalOut - prevOut) / Math.abs(prevOut)) * 100 : 0;
 
         tvSpendingTotal.setText("$" + String.format("%.2f", totalOut));
+        // Spending up = red, down = green
         boolean isDown = pctChange <= 0;
         tvSpendingTrend.setText((isDown ? "↓" : "↑") + " " + String.format("%.0f", Math.abs(pctChange)) + "% vs last month");
+        tvSpendingTrend.setTextColor(isDown ? 0xFF2B9348 : 0xFFE53935);
 
-        // Line chart
-        final double[] chartVals = {totalOut * 0.7, totalOut * 0.85, totalOut * 0.9, totalOut * 0.95, totalOut * 1.02, totalOut};
+        // Daily-spending line chart from actual data
         chartSpendingLine.removeAllViews();
+        final List<Transaction> lineTxs = new ArrayList<>(monthTxs);
+        Calendar cal = Calendar.getInstance();
+        // Build day-indexed totals
+        final Map<Integer, Double> dayTotals = new HashMap<>();
+        int maxDay = 0;
+        for (Transaction t : lineTxs) {
+            if (t.getType() != Transaction.Type.OUTGOING) continue;
+            cal.setTimeInMillis(t.getDateMillis());
+            int day = cal.get(Calendar.DAY_OF_MONTH);
+            double cur = dayTotals.getOrDefault(day, 0.0);
+            dayTotals.put(day, cur + t.getAmount());
+            if (day > maxDay) maxDay = day;
+        }
+        int daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
+        if (maxDay == 0) maxDay = daysInMonth;
+        final double maxDaily;
+        {
+            double m = 0;
+            for (double v : dayTotals.values()) if (v > m) m = v;
+            maxDaily = m > 0 ? m : 1;
+        }
+        final int totalDays = Math.max(maxDay, daysInMonth);
+
         View lineView = new View(this) {
             private final Paint linePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            private final Paint fillPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
             private final Paint gridPaint = new Paint();
             private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            private final Paint dotPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
             @Override
             protected void onDraw(Canvas canvas) {
                 super.onDraw(canvas);
@@ -495,43 +597,65 @@ public class HomeActivity extends AppCompatActivity {
                 gridPaint.setStrokeWidth(1);
                 textPaint.setTextSize(24);
                 textPaint.setColor(0xFFAAAAAA);
-                double maxV = 0;
-                for (double v : chartVals) if (v > maxV) maxV = v;
-                if (maxV == 0) maxV = 1;
                 for (int i = 0; i <= 4; i++) {
                     float y = padT + ch * (1f - i / 4f);
                     canvas.drawLine(padL, y, w - padR, y, gridPaint);
-                    canvas.drawText("$" + (int)(maxV * i / 4f), 2, y + 8, textPaint);
+                    canvas.drawText("$" + (int)(maxDaily * i / 4f), 2, y + 8, textPaint);
                 }
+                // Build point list for days with data
+                List<Integer> dataDays = new ArrayList<>(dayTotals.keySet());
+                Collections.sort(dataDays);
+                if (dataDays.size() < 2) {
+                    // Not enough points — show a flat line or placeholder
+                    textPaint.setColor(0xFFD4A373);
+                    textPaint.setTextSize(28);
+                    canvas.drawText("Not enough daily data", padL + 20, padT + ch / 2f + 10, textPaint);
+                    return;
+                }
+                float step = cw / (totalDays - 1 > 0 ? totalDays - 1 : 1);
                 linePaint.setColor(0xFFF9A84D);
                 linePaint.setStrokeWidth(3);
                 linePaint.setStyle(Paint.Style.STROKE);
+                dotPaint.setColor(0xFFF9A84D);
+                dotPaint.setStyle(Paint.Style.FILL);
                 Path path = new Path();
-                float step = cw / (chartVals.length - 1);
-                for (int i = 0; i < chartVals.length; i++) {
-                    float x = padL + i * step;
-                    float y = padT + ch * (float)(1 - chartVals[i] / maxV);
+                for (int i = 0; i < dataDays.size(); i++) {
+                    int day = dataDays.get(i);
+                    float x = padL + (day - 1) * step;
+                    float y = padT + ch * (float)(1 - dayTotals.get(day) / maxDaily);
                     if (i == 0) path.moveTo(x, y);
                     else path.lineTo(x, y);
+                    canvas.drawCircle(x, y, 4, dotPaint);
                 }
+                // Fill under curve
+                fillPaint.setColor(0x30F9A84D);
+                fillPaint.setStyle(Paint.Style.FILL);
+                Path fillPath = new Path(path);
+                int lastDay = dataDays.get(dataDays.size() - 1);
+                fillPath.lineTo(padL + (lastDay - 1) * step, padT + ch);
+                fillPath.lineTo(padL + (dataDays.get(0) - 1) * step, padT + ch);
+                fillPath.close();
+                canvas.drawPath(fillPath, fillPaint);
                 canvas.drawPath(path, linePaint);
-                textPaint.setTextSize(22);
-                String[] labels = {"May 1", "May 7", "May 28"};
-                int[] idxs = {0, 2, chartVals.length - 1};
-                for (int i = 0; i < 3; i++) {
-                    float x = padL + idxs[i] * step;
-                    canvas.drawText(labels[i], x - 16, h - 4, textPaint);
-                }
+                // X-axis labels (first, middle, last)
+                textPaint.setTextSize(20);
+                textPaint.setColor(0xFFD4A373);
+                String label1 = "Day 1";
+                String labelM = "Day " + (totalDays / 2);
+                String labelL = "Day " + totalDays;
+                canvas.drawText(label1, padL, h - 4, textPaint);
+                canvas.drawText(labelM, padL + cw / 2f - 16, h - 4, textPaint);
+                canvas.drawText(labelL, padL + cw - 32, h - 4, textPaint);
             }
         };
         lineView.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, dp(120)));
         chartSpendingLine.addView(lineView);
 
-        // Spending by category
+        // Spending by category — rounded progress bars
         containerSpendingCategories.removeAllViews();
         Map<String, Double> catTotals = new HashMap<>();
-        for (Transaction t : allTransactions) {
+        for (Transaction t : monthTxs) {
             if (t.getType() == Transaction.Type.OUTGOING) {
                 double cur = catTotals.getOrDefault(t.getCategory(), 0.0);
                 catTotals.put(t.getCategory(), cur + t.getAmount());
@@ -563,16 +687,18 @@ public class HomeActivity extends AppCompatActivity {
                     dp(80), LinearLayout.LayoutParams.WRAP_CONTENT));
             row.addView(tvName);
 
+            // Rounded progress bar with stadium caps
             LinearLayout barOuter = new LinearLayout(this);
             barOuter.setLayoutParams(new LinearLayout.LayoutParams(
                     0, dp(14), 0.35f));
-            barOuter.setBackgroundColor(0xFFF0E8D5);
-            barOuter.setPadding(dp(2), dp(1), dp(2), dp(1));
+            barOuter.setBackgroundResource(R.drawable.progress_bar_bg);
+
             View barFill = new View(this);
             float fillW = (float)(pct / 100);
             barFill.setLayoutParams(new LinearLayout.LayoutParams(
                     0, LinearLayout.LayoutParams.MATCH_PARENT, fillW));
-            barFill.setBackgroundColor(color);
+            barFill.setBackgroundResource(R.drawable.progress_bar_fill);
+            barFill.getBackground().setTint(color);
             barOuter.addView(barFill);
             row.addView(barOuter);
 
@@ -596,6 +722,9 @@ public class HomeActivity extends AppCompatActivity {
 
             containerSpendingCategories.addView(row);
         }
+
+        // Update dropdown
+        ((TextView) findViewById(R.id.tv_spending_dropdown)).setText(formatMonthYear(selectedInsightYear, selectedInsightMonth) + " ▼");
     }
 
     // ── SCREEN 3: INCOME ──
@@ -603,38 +732,99 @@ public class HomeActivity extends AppCompatActivity {
     private void populateIncome() {
         if (allTransactions == null) return;
 
+        List<Transaction> monthTxs = getTransactionsForMonth(selectedInsightYear, selectedInsightMonth);
+
         double totalIn = 0;
-        for (Transaction t : allTransactions) {
+        for (Transaction t : monthTxs) {
             if (t.getType() == Transaction.Type.INCOMING) totalIn += t.getAmount();
         }
-        double priorIn = totalIn / 1.08;
-        double pctChange = priorIn > 0 ? ((totalIn - priorIn) / priorIn) * 100 : 0;
+
+        // Previous month comparison
+        int prevMonth = selectedInsightMonth == 0 ? 11 : selectedInsightMonth - 1;
+        int prevYear = selectedInsightMonth == 0 ? selectedInsightYear - 1 : selectedInsightYear;
+        List<Transaction> prevTxs = getTransactionsForMonth(prevYear, prevMonth);
+        double prevIn = 0;
+        for (Transaction t : prevTxs) {
+            if (t.getType() == Transaction.Type.INCOMING) prevIn += t.getAmount();
+        }
+
+        double pctChange = prevIn != 0 ? ((totalIn - prevIn) / Math.abs(prevIn)) * 100 : 0;
 
         tvIncomeTotal.setText("$" + String.format("%.2f", totalIn));
-        tvIncomeTrend.setText("↑ " + String.format("%.0f", Math.abs(pctChange)) + "% vs last month");
+        // Income up = green, down = red
+        boolean isUp = pctChange >= 0;
+        tvIncomeTrend.setText((isUp ? "↑" : "↓") + " " + String.format("%.0f", Math.abs(pctChange)) + "% vs last month");
+        tvIncomeTrend.setTextColor(isUp ? 0xFF2B9348 : 0xFFE53935);
 
-        // Wallet icon (drawn as a green circle with $)
+        // Wallet icon
         ivIncomeWallet.setImageDrawable(null);
         ivIncomeWallet.setBackgroundColor(0xFF38B000);
         ivIncomeWallet.setPadding(dp(12), dp(12), dp(12), dp(12));
-        // Set imageView to green circle with "$" via a custom drawable approach
         ivIncomeWallet.setBackgroundResource(R.drawable.circle_dark);
 
-        // Next expected income
+        // Dynamic Next Expected Income — find recurring income pattern
+        List<Transaction> incomeTxs = new ArrayList<>();
         Calendar cal = Calendar.getInstance();
-        cal.set(Calendar.YEAR, 2026);
-        cal.set(Calendar.MONTH, Calendar.JUNE);
-        cal.set(Calendar.DAY_OF_MONTH, 5);
-        long nextPay = cal.getTimeInMillis();
-        long now = System.currentTimeMillis();
-        long diffDays = (nextPay - now) / (1000 * 60 * 60 * 24);
+        for (Transaction t : allTransactions) {
+            if (t.getType() == Transaction.Type.INCOMING) {
+                incomeTxs.add(t);
+            }
+        }
+        // Sort by date ascending
+        incomeTxs.sort((a, b) -> Long.compare(a.getDateMillis(), b.getDateMillis()));
+
+        String nextDateStr = "—";
+        String countdownStr = "No recurring income";
+        int maxDay = 0;
+        Map<String, Integer> incomeDays = new HashMap<>();
+        for (Transaction t : incomeTxs) {
+            cal.setTimeInMillis(t.getDateMillis());
+            int day = cal.get(Calendar.DAY_OF_MONTH);
+            String key = t.getMerchant() != null ? t.getMerchant().toLowerCase() : "";
+            if (!key.isEmpty()) {
+                incomeDays.put(key, day);
+                if (day > maxDay) maxDay = day;
+            }
+        }
+        // Most common income day (mode)
+        Map<Integer, Integer> dayFreq = new HashMap<>();
+        for (int d : incomeDays.values()) {
+            dayFreq.put(d, dayFreq.getOrDefault(d, 0) + 1);
+        }
+        int predictedDay = 1;
+        int maxFreq = 0;
+        for (Map.Entry<Integer, Integer> e : dayFreq.entrySet()) {
+            if (e.getValue() > maxFreq) {
+                maxFreq = e.getValue();
+                predictedDay = e.getKey();
+            }
+        }
+
+        Calendar now = Calendar.getInstance();
+        Calendar nextIncome = Calendar.getInstance();
+        nextIncome.set(Calendar.DAY_OF_MONTH, predictedDay);
+        if (nextIncome.get(Calendar.DAY_OF_MONTH) < now.get(Calendar.DAY_OF_MONTH)) {
+            nextIncome.add(Calendar.MONTH, 1);
+        }
+        long diffMs = nextIncome.getTimeInMillis() - now.getTimeInMillis();
+        long diffDays = diffMs / (1000 * 60 * 60 * 24);
         if (diffDays < 0) diffDays = 0;
-        tvNextIncomeCountdown.setText("In " + diffDays + " days");
-        tvNextIncomeDate.setText("June 5, 2026");
+
+        if (maxFreq > 0) {
+            SimpleDateFormat sdf = new SimpleDateFormat("MMMM d, yyyy", Locale.US);
+            nextDateStr = sdf.format(nextIncome.getTime());
+            countdownStr = "In " + diffDays + " day" + (diffDays != 1 ? "s" : "");
+        }
+
+        tvNextIncomeCountdown.setText(countdownStr);
+        tvNextIncomeDate.setText(nextDateStr);
 
         // Calendar icon
         ivIncomeCalendar.setImageDrawable(null);
         ivIncomeCalendar.setBackgroundResource(R.drawable.circle_green);
+
+        // Update dropdown
+        ((TextView) findViewById(R.id.tv_income_dropdown)).setText(formatMonthYear(selectedInsightYear, selectedInsightMonth) + " ▼");
     }
 
     // ── SCREEN 4: TRENDS ──
@@ -642,29 +832,57 @@ public class HomeActivity extends AppCompatActivity {
     private void populateTrends() {
         if (allTransactions == null) return;
 
-        double totalIn = 0, totalOut = 0;
-        for (Transaction t : allTransactions) {
-            if (t.getType() == Transaction.Type.INCOMING) totalIn += t.getAmount();
-            else totalOut += t.getAmount();
+        // Aggregate monthly totals for last 6 months
+        Calendar cal = Calendar.getInstance();
+        int currentYear = cal.get(Calendar.YEAR);
+        int currentMonth = cal.get(Calendar.MONTH);
+
+        double[] monthlyIn = new double[6];
+        double[] monthlyOut = new double[6];
+        String[] monthLabels = new String[6];
+        double grandTotal = 0;
+
+        double minMonth = Double.MAX_VALUE, maxMonth = 0;
+        for (int i = 0; i < 6; i++) {
+            int m = (currentMonth - 5 + i) % 12;
+            int y = currentYear;
+            if (m < 0) { m += 12; y--; }
+            monthLabels[i] = monthNames[m].substring(0, 3);
+            List<Transaction> txs = getTransactionsForMonth(y, m);
+            double in = 0, out = 0;
+            for (Transaction t : txs) {
+                if (t.getType() == Transaction.Type.INCOMING) in += t.getAmount();
+                else out += t.getAmount();
+            }
+            monthlyIn[i] = in;
+            monthlyOut[i] = out;
+            double total = in + out;
+            grandTotal += total;
+            if (total > maxMonth) maxMonth = total;
+            if (total < minMonth) minMonth = total;
         }
-        double totalFlow = totalIn > totalOut ? totalIn * 1.2 : totalOut * 1.2;
-        if (totalFlow == 0) totalFlow = 100;
 
-        // Simulated monthly data
-        double[] monthlyVals = {totalFlow * 0.75, totalFlow * 1.0, totalFlow * 0.9, totalFlow * 0.4, totalFlow * 0.65};
-        double totalOverTime = 0;
-        for (double v : monthlyVals) totalOverTime += v;
-        double priorTotal = totalOverTime * 1.08;
-        double pctChange = priorTotal > 0 ? ((totalOverTime - priorTotal) / priorTotal) * 100 : 0;
+        if (maxMonth == 0) maxMonth = 1;
 
-        tvTrendsTotal.setText("$" + String.format("%.2f", totalOverTime));
-        tvTrendsIndicator.setText("↑ " + String.format("%.0f", Math.abs(pctChange)) + "% vs last month");
+        // Compare current 3 months vs previous 3 months
+        double recent3 = 0, prior3 = 0;
+        for (int i = 3; i < 6; i++) recent3 += monthlyOut[i];
+        for (int i = 0; i < 3; i++) prior3 += monthlyOut[i];
+        double pctChange = prior3 != 0 ? ((recent3 - prior3) / Math.abs(prior3)) * 100 : 0;
 
-        // Bar chart
+        tvTrendsTotal.setText("$" + String.format("%.2f", grandTotal));
+        boolean isDown = pctChange <= 0;
+        tvTrendsIndicator.setText((isDown ? "↓" : "↑") + " " + String.format("%.0f", Math.abs(pctChange)) + "% (last 3 vs prev 3 months)");
+        tvTrendsIndicator.setTextColor(isDown ? 0xFF2B9348 : 0xFFE53935);
+
+        // Bar chart — spending bars (orange) + income overlay (green)
         chartTrendsBar.removeAllViews();
-        final double[] barVals = monthlyVals.clone();
+        final double[] outVals = monthlyOut.clone();
+        final double[] inVals = monthlyIn.clone();
+        final double maxVal = maxMonth;
         View barView = new View(this) {
-            private final Paint barPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            private final Paint outPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            private final Paint inPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
             private final Paint gridPaint = new Paint();
             private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
             @Override
@@ -673,10 +891,9 @@ public class HomeActivity extends AppCompatActivity {
                 float w = getWidth(), h = getHeight();
                 float padL = 40f, padR = 12f, padT = 8f, padB = 28f;
                 float cw = w - padL - padR, ch = h - padT - padB;
-                double maxV = 0;
-                for (double v : barVals) if (v > maxV) maxV = v;
+                double maxV = maxVal;
                 if (maxV == 0) maxV = 1;
-                gridPaint.setColor(0xFF52B788);
+                gridPaint.setColor(0xFFE0E0E0);
                 gridPaint.setStrokeWidth(1);
                 textPaint.setTextSize(22);
                 textPaint.setColor(0xFFD4A373);
@@ -685,30 +902,63 @@ public class HomeActivity extends AppCompatActivity {
                     canvas.drawLine(padL, y, w - padR, y, gridPaint);
                     canvas.drawText("$" + (int)(maxV * i / 4f), 2, y + 8, textPaint);
                 }
-                float barW = cw / barVals.length * 0.7f;
-                float gap = cw / barVals.length;
-                barPaint.setColor(0xFF52B788);
-                String[] labels = {"Dec", "Jan", "Feb", "Mar", "Apr"};
-                for (int i = 0; i < barVals.length; i++) {
-                    float barH = (float)(barVals[i] / maxV * ch);
-                    float x = padL + i * gap + (gap - barW) / 2f;
-                    float y = padT + ch - barH;
-                    canvas.drawRoundRect(x, y, x + barW, padT + ch, 8, 8, barPaint);
+                float barW = cw / outVals.length * 0.35f;
+                float gap = cw / outVals.length;
+                for (int i = 0; i < outVals.length; i++) {
+                    // Spending bar (orange)
+                    float outH = (float)(outVals[i] / maxV * ch);
+                    float ox = padL + i * gap + (gap - barW) / 2f;
+                    float oy = padT + ch - outH;
+                    outPaint.setColor(0xFFF9A84D);
+                    canvas.drawRoundRect(ox, oy, ox + barW, padT + ch, 6, 6, outPaint);
+
+                    // Income bar (green) — stacked behind or alongside
+                    float inH = (float)(inVals[i] / maxV * ch);
+                    float ix = ox + barW + 2;
+                    float iy = padT + ch - inH;
+                    inPaint.setColor(0xFF2B9348);
+                    canvas.drawRoundRect(ix, iy, ix + barW, padT + ch, 6, 6, inPaint);
+
+                    // Label
                     textPaint.setTextSize(20);
                     textPaint.setColor(0xFFD4A373);
-                    float labelX = x + barW / 2f - 14;
-                    canvas.drawText(labels[i], labelX, h - 4, textPaint);
+                    float labelX = ox + barW - 10;
+                    canvas.drawText(monthLabels[i], labelX, h - 4, textPaint);
                 }
+                // Legend
+                textPaint.setTextSize(22);
+                textPaint.setColor(0xFFF9A84D);
+                canvas.drawText("■ Spending", padL, padT - 4, textPaint);
+                float legendX = padL + 200;
+                textPaint.setColor(0xFF2B9348);
+                canvas.drawText("■ Income", legendX, padT - 4, textPaint);
             }
         };
         barView.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, dp(140)));
         chartTrendsBar.addView(barView);
 
-        // Key insight
-        double spendRatio = totalFlow > 0 ? (totalOut / totalFlow) * 100 : 0;
-        tvTrendsKeyInsight.setText("Your Spending is down " + String.format("%.0f", Math.abs(pctChange))
-                + "% compared to last 6 months. Great Job ! ");
+        // Dynamic AI summary
+        double maxOutMonth = 0, minOutMonth = Double.MAX_VALUE;
+        int maxIdx = 0, minIdx = 0;
+        for (int i = 0; i < 6; i++) {
+            if (monthlyOut[i] > maxOutMonth) { maxOutMonth = monthlyOut[i]; maxIdx = i; }
+            if (monthlyOut[i] < minOutMonth) { minOutMonth = monthlyOut[i]; minIdx = i; }
+        }
+        String summary;
+        if (pctChange < -10) {
+            summary = "Your spending has decreased significantly (" + String.format("%.0f", Math.abs(pctChange))
+                    + "%) compared to the prior period. Great job keeping expenses under control!";
+        } else if (pctChange > 10) {
+            summary = "Your spending has increased " + String.format("%.0f", pctChange)
+                    + "% vs the prior period. Review " + monthLabels[maxIdx] + " for the highest spending ("
+                    + "$" + String.format("%.0f", maxOutMonth) + ").";
+        } else {
+            summary = "Your spending has been relatively stable over the last 6 months ("
+                    + (pctChange >= 0 ? "+" : "") + String.format("%.0f", pctChange)
+                    + "% vs prior period). Consistent budgeting habits!";
+        }
+        tvTrendsKeyInsight.setText(summary);
     }
 
     // ── GEMINI BATCH CLASSIFICATION ──
