@@ -28,6 +28,10 @@
                     android:name=".ui.onboarding.HomeActivity"
                     android:exported="false" />
 
+            <activity
+                    android:name=".ui.settings.SettingsActivity"
+                    android:exported="false" />
+
         </application>
 
     </manifest>

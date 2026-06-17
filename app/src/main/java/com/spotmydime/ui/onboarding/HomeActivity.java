@@ -2,6 +2,7 @@ package com.spotmydime.ui.onboarding;
 
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
+import android.content.Intent;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
@@ -1239,7 +1240,12 @@ public class HomeActivity extends AppCompatActivity {
         }
 
         if (index == 4) {
-            Toast.makeText(this, "Coming soon", Toast.LENGTH_SHORT).show();
+            Intent settingsIntent = new Intent(HomeActivity.this, com.spotmydime.ui.settings.SettingsActivity.class);
+            String userName = getIntent().getStringExtra("user_name");
+            String userEmail = getIntent().getStringExtra("user_email");
+            settingsIntent.putExtra("user_name", userName);
+            settingsIntent.putExtra("user_email", userEmail);
+            startActivity(settingsIntent);
         }
     }
 
