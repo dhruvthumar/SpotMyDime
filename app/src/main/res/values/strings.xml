@@ -29,6 +29,6 @@
     <string name="home_top_categories">Top Categories</string>
     <string name="home_view_all">View all</string>
     <string name="home_recent_transactions">Recent Transactions</string>
-    <!-- Google Generative AI (Gemini) API key. Get yours free at https://aistudio.google.com/apikey -->
-    <string name="generative_api_key">AQ.Ab8RN6INd_LzGKjM6-pX0yTBRrHkm7qrDOvbJCk8Qgp5ZKZbiw</string>
+    <!-- Gemini API key is now loaded via BuildConfig from local.properties -->
+    <string name="generative_api_key"></string>
 </resources>

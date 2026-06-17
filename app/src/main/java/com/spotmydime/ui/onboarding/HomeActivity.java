@@ -105,8 +105,8 @@ public class HomeActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
 
-        // Initialize the Gemini AI API key from resources
-        GeminiClassifier.apiKey = getString(R.string.generative_api_key);
+        // Initialize the Gemini AI API key from BuildConfig (read from local.properties)
+        GeminiClassifier.apiKey = BuildConfig.GEMINI_API_KEY;
 
         String userName = getIntent().getStringExtra("user_name");
         String userEmail = getIntent().getStringExtra("user_email");

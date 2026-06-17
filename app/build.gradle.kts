@@ -3,6 +3,15 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+fun getLocalProperty(key: String): String? {
+    val props = java.util.Properties()
+    val file = rootProject.file("local.properties")
+    if (file.exists()) {
+        file.inputStream().use { props.load(it) }
+    }
+    return props.getProperty(key)
+}
+
 android {
     namespace = "com.spotmydime"
     compileSdk = 35
@@ -14,6 +23,11 @@ android {
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "GEMINI_API_KEY", "\"${getLocalProperty("gemini.api.key") ?: ""}\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {
