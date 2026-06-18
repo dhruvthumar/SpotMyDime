@@ -23,12 +23,11 @@
                     android:id="@+id/btn_settings_back"
                     android:layout_width="40dp"
                     android:layout_height="40dp"
-                    android:src="@android:drawable/ic_media_previous"
-                    android:padding="8dp"
+            android:src="@android:drawable/ic_media_previous"
+                    android:padding="12dp"
                     android:layout_centerVertical="true"
                     android:layout_alignParentStart="true"
                     android:contentDescription="Back" />
-
             <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -307,6 +306,34 @@
                             android:orientation="vertical"
                             android:paddingHorizontal="4dp">
 
+                        <!-- Provide Feedback -->
+                        <LinearLayout
+                                android:id="@+id/btn_settings_feedback"
+                                android:layout_width="match_parent"
+                                android:layout_height="56dp"
+                                android:orientation="horizontal"
+                                android:gravity="center_vertical"
+                                android:paddingHorizontal="16dp"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:foreground="?attr/selectableItemBackground">
+                            <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:text="Provide Feedback"
+                                    android:textColor="#000000"
+                                    android:textSize="16sp" />
+                            <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="›"
+                                    android:textColor="#D4A373"
+                                    android:textSize="20sp" />
+                        </LinearLayout>
+
+                        <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F0E8D5" android:layout_marginHorizontal="16dp" />
+
                         <!-- How It Works -->
                         <LinearLayout
                                 android:id="@+id/btn_settings_how_it_works"
@@ -420,8 +447,8 @@
                 android:layout_marginTop="16dp">
             <ImageView
                     android:id="@+id/btn_subscriptions_back"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
                     android:src="@android:drawable/ic_media_previous"
                     android:padding="8dp"
                     android:layout_centerVertical="true"
@@ -497,8 +524,8 @@
                 android:layout_marginTop="16dp">
             <ImageView
                     android:id="@+id/btn_budget_back"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
                     android:src="@android:drawable/ic_media_previous"
                     android:padding="8dp"
                     android:layout_centerVertical="true"
@@ -565,8 +592,8 @@
                 android:layout_marginTop="16dp">
             <ImageView
                     android:id="@+id/btn_nicknames_back"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
                     android:src="@android:drawable/ic_media_previous"
                     android:padding="8dp"
                     android:layout_centerVertical="true"
@@ -633,8 +660,8 @@
                 android:layout_marginTop="16dp">
             <ImageView
                     android:id="@+id/btn_categories_back"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
                     android:src="@android:drawable/ic_media_previous"
                     android:padding="8dp"
                     android:layout_centerVertical="true"
@@ -691,8 +718,8 @@
                 android:layout_marginTop="16dp">
             <ImageView
                     android:id="@+id/btn_edit_category_back"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
                     android:src="@android:drawable/ic_media_previous"
                     android:padding="8dp"
                     android:layout_centerVertical="true"
@@ -706,34 +733,6 @@
                     android:textSize="22sp"
                     android:textStyle="bold"
                     android:layout_centerInParent="true" />
-            <TextView
-                    android:id="@+id/btn_edit_category_delete"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Delete"
-                    android:textColor="#E53935"
-                    android:textSize="15sp"
-                    android:textStyle="bold"
-                    android:layout_toStartOf="@+id/btn_edit_category_save"
-                    android:layout_centerVertical="true"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:foreground="?attr/selectableItemBackground"
-                    android:padding="8dp" />
-            <TextView
-                    android:id="@+id/btn_edit_category_save"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Save"
-                    android:textColor="#F9A84D"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    android:layout_alignParentEnd="true"
-                    android:layout_centerVertical="true"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:foreground="?attr/selectableItemBackground"
-                    android:padding="8dp" />
         </RelativeLayout>
 
         <LinearLayout
@@ -777,6 +776,46 @@
                     android:orientation="horizontal"
                     android:gravity="center"
                     android:layout_marginTop="12dp" />
+
+            <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="32dp"
+                    android:gravity="center_vertical">
+
+                <TextView
+                        android:id="@+id/btn_edit_category_delete"
+                        android:layout_width="0dp"
+                        android:layout_height="56dp"
+                        android:layout_weight="1"
+                        android:text="Delete"
+                        android:textColor="#E53935"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:gravity="center"
+                        android:background="@drawable/input_outline"
+                        android:layout_marginEnd="8dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:foreground="?attr/selectableItemBackground" />
+
+                <TextView
+                        android:id="@+id/btn_edit_category_save"
+                        android:layout_width="0dp"
+                        android:layout_height="56dp"
+                        android:layout_weight="1"
+                        android:text="Save"
+                        android:textColor="#FFFFFF"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:gravity="center"
+                        android:background="@drawable/btn_orange_rounded"
+                        android:layout_marginStart="8dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:foreground="?attr/selectableItemBackground" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 
@@ -797,8 +836,8 @@
                 android:layout_marginTop="16dp">
             <ImageView
                     android:id="@+id/btn_auto_tracking_back"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
                     android:src="@android:drawable/ic_media_previous"
                     android:padding="8dp"
                     android:layout_centerVertical="true"
@@ -1309,6 +1348,155 @@
                 </LinearLayout>
             </LinearLayout>
         </androidx.cardview.widget.CardView>
+    </LinearLayout>
+
+    <!-- ════════════════════════════════════════════════════════ -->
+    <!-- SCREEN 9: PROVIDE FEEDBACK                              -->
+    <!-- ════════════════════════════════════════════════════════ -->
+    <LinearLayout
+            android:id="@+id/container_settings_feedback"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+        <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:paddingHorizontal="20dp"
+                android:layout_marginTop="16dp">
+            <ImageView
+                    android:id="@+id/btn_feedback_back"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:src="@android:drawable/ic_media_previous"
+                    android:padding="12dp"
+                    android:layout_centerVertical="true"
+                    android:layout_alignParentStart="true"
+                    android:contentDescription="Back" />
+            <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Provide Feedback"
+                    android:textColor="#000000"
+                    android:textSize="22sp"
+                    android:textStyle="bold"
+                    android:layout_centerInParent="true" />
+        </RelativeLayout>
+
+        <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingHorizontal="24dp"
+                android:layout_marginTop="20dp">
+
+            <!-- To -->
+            <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="To"
+                    android:textColor="#000000"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+            <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:background="@drawable/input_outline"
+                    android:text="Developers@SpotMyDime"
+                    android:textColor="#D4A373"
+                    android:textSize="16sp"
+                    android:paddingHorizontal="20dp"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="20dp" />
+
+            <!-- Feature -->
+            <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Feature"
+                    android:textColor="#000000"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+            <TextView
+                    android:id="@+id/tv_feedback_feature"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:background="@drawable/input_outline"
+                    android:hint="Select a feature"
+                    android:textColorHint="#D4A373"
+                    android:textColor="#111111"
+                    android:textSize="16sp"
+                    android:paddingHorizontal="20dp"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="20dp"
+                    android:clickable="true"
+                    android:focusable="true" />
+
+            <!-- Subject -->
+            <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Subject"
+                    android:textColor="#000000"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+            <EditText
+                    android:id="@+id/et_feedback_subject"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:background="@drawable/input_outline"
+                    android:hint="Brief subject line"
+                    android:textColorHint="#D4A373"
+                    android:textColor="#111111"
+                    android:textSize="16sp"
+                    android:paddingHorizontal="20dp"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="20dp"
+                    android:inputType="text" />
+
+            <!-- Message -->
+            <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Message"
+                    android:textColor="#000000"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+            <EditText
+                    android:id="@+id/et_feedback_message"
+                    android:layout_width="match_parent"
+                    android:layout_height="140dp"
+                    android:background="@drawable/input_outline"
+                    android:hint="Describe your suggestion or feedback..."
+                    android:textColorHint="#D4A373"
+                    android:textColor="#111111"
+                    android:textSize="16sp"
+                    android:paddingHorizontal="20dp"
+                    android:paddingVertical="12dp"
+                    android:gravity="top"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="32dp"
+                    android:inputType="textMultiLine" />
+
+            <!-- Send Button -->
+            <TextView
+                    android:id="@+id/btn_feedback_send"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:gravity="center"
+                    android:text="SEND"
+                    android:textColor="#FFFFFF"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:background="#F9A84D"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground" />
+        </LinearLayout>
     </LinearLayout>
 
 </FrameLayout>

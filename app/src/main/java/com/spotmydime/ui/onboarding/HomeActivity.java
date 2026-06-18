@@ -3,7 +3,9 @@ package com.spotmydime.ui.onboarding;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
@@ -52,6 +54,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -80,6 +83,7 @@ public class HomeActivity extends AppCompatActivity {
     private LinearLayout containerSettingsEditCategory;
     private LinearLayout containerSettingsAutoTracking;
     private LinearLayout containerSettingsMailScanning;
+    private LinearLayout containerSettingsFeedback;
     private SharedPreferences settingsPrefs;
     private final Map<String, Double> budgets = new HashMap<>();
     private final List<Map<String, String>> subscriptions = new ArrayList<>();
@@ -201,6 +205,7 @@ public class HomeActivity extends AppCompatActivity {
         containerSettingsEditCategory = findViewById(R.id.container_settings_edit_category);
         containerSettingsAutoTracking = findViewById(R.id.container_settings_auto_tracking);
         containerSettingsMailScanning = findViewById(R.id.container_settings_mail_scanning);
+        containerSettingsFeedback = findViewById(R.id.container_settings_feedback);
 
         tvInsightsNet = findViewById(R.id.tv_insights_net);
         tvInsightsNetLabel = findViewById(R.id.tv_insights_net_label);
@@ -278,6 +283,7 @@ public class HomeActivity extends AppCompatActivity {
 
         setupInsightsSubNav();
         setupBottomNav();
+        loadCachedTransactions();
         fetchAndShowTransactions();
         initSettings();
     }
@@ -403,6 +409,16 @@ public class HomeActivity extends AppCompatActivity {
 
     private int dp(int dp) {
         return (int) (dp * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    private long getMonthStartMillis() {
+        Calendar cal = Calendar.getInstance();
+        cal.set(Calendar.DAY_OF_MONTH, 1);
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+        return cal.getTimeInMillis();
     }
 
     private final String[] monthNames = {
@@ -1354,6 +1370,7 @@ public class HomeActivity extends AppCompatActivity {
                         }
                     }
                     allTransactions = filtered;
+                    saveTransactionsToCache(filtered);
                     if (filtered.isEmpty()) {
                         addEmptyState();
                     } else {
@@ -1373,6 +1390,14 @@ public class HomeActivity extends AppCompatActivity {
                 });
             }
         });
+    }
+
+    private void loadCachedTransactions() {
+        List<Transaction> cached = loadTransactionsFromCache();
+        if (cached != null && !cached.isEmpty()) {
+            allTransactions = cached;
+            populateDashboard(cached);
+        }
     }
 
     private void populateDashboard(List<Transaction> transactions) {
@@ -2196,6 +2221,7 @@ public class HomeActivity extends AppCompatActivity {
         setupSettingsBackButtons();
         setupSettingsEditCategory();
         setupSettingsColorPicker();
+        setupFeedbackScreen();
         showSettingsScreen(containerSettingsMain);
     }
 
@@ -2249,31 +2275,56 @@ public class HomeActivity extends AppCompatActivity {
         findViewById(R.id.btn_settings_notifications).setOnClickListener(v -> {
             Toast.makeText(this, "Notifications - coming soon", Toast.LENGTH_SHORT).show();
         });
-        findViewById(R.id.btn_settings_how_it_works).setOnClickListener(v -> {
-            new AlertDialog.Builder(this)
-                    .setTitle("How It Works")
-                    .setMessage("SpotMyDime automatically tracks your spending by scanning your Gmail inbox for transaction receipts. "
-                            + "Transactions are categorized, visualized, and summarized so you always know where your money goes.")
-                    .setPositiveButton("Got it", null)
-                    .show();
-        });
-        findViewById(R.id.btn_settings_privacy_policy).setOnClickListener(v -> {
-            new AlertDialog.Builder(this)
-                    .setTitle("Privacy Policy")
-                    .setMessage("Your data stays on your device. SpotMyDime does not upload, share, or sell your personal or financial information. "
-                            + "Gmail data is accessed only with your explicit permission and processed locally.")
-                    .setPositiveButton("Got it", null)
-                    .show();
-        });
-        findViewById(R.id.btn_settings_about).setOnClickListener(v -> {
-            new AlertDialog.Builder(this)
-                    .setTitle("About SpotMyDime")
-                    .setMessage("Version 1.0.0\n\n"
-                            + "A smart expense tracker that uses AI to automatically categorize your transactions from Gmail. "
-                            + "Built with love for personal finance.")
-                    .setPositiveButton("OK", null)
-                    .show();
-        });
+        findViewById(R.id.btn_settings_feedback).setOnClickListener(v -> showSettingsScreen(containerSettingsFeedback));
+        findViewById(R.id.btn_settings_how_it_works).setOnClickListener(v -> showSupportDialog("How It Works",
+                "SpotMyDime is a personal finance assistant that connects to your Gmail inbox to automatically detect and track your spending.\n\n"
+                        + "Here is how it works in three simple steps:\n\n"
+                        + "1. Connect Your Gmail\n"
+                        + "Grant SpotMyDime read-only access to your Gmail account. We only scan emails that match transaction-related keywords "
+                        + "(like \"receipt\", \"invoice\", \"payment confirmation\") — nothing else leaves your device.\n\n"
+                        + "2. Automatic Transaction Detection\n"
+                        + "Our on-device AI reads the subject and body of matching emails to extract key transaction details: "
+                        + "merchant name, amount, date, category, and payment method. All processing happens locally on your device.\n\n"
+                        + "3. Insights & Budgeting\n"
+                        + "Transactions are organized into categories, visualized with charts on your Insights dashboard, "
+                        + "and analyzed for recurring subscriptions. You can add expenses manually, set budget goals, "
+                        + "and view your net cash flow at a glance.\n\n"
+                        + "Your financial data never leaves your phone. No uploads, no servers, no third parties."));
+        findViewById(R.id.btn_settings_privacy_policy).setOnClickListener(v -> showSupportDialog("Privacy Policy",
+                "Last updated: June 2026\n\n"
+                        + "SpotMyDime takes your privacy seriously. This policy describes how your information is handled.\n\n"
+                        + "1. Data Storage\n"
+                        + "All transaction data extracted from your emails is stored exclusively on your device in local storage. "
+                        + "We do not operate cloud servers, databases, or remote storage of any kind.\n\n"
+                        + "2. Gmail Access\n"
+                        + "SpotMyDime requests read-only access to your Gmail account via OAuth 2.0. "
+                        + "We only scan emails whose subject lines match keywords you have configured. "
+                        + "We never read, store, or transmit unrelated emails.\n\n"
+                        + "3. No Data Sharing\n"
+                        + "SpotMyDime does not collect, share, sell, or transmit any personal or financial information "
+                        + "to third parties. There are no analytics SDKs, no ad networks, and no tracking code.\n\n"
+                        + "4. AI Processing\n"
+                        + "All AI-based transaction extraction runs entirely on-device using a local language model. "
+                        + "No email content or transaction data is sent to any external AI service.\n\n"
+                        + "5. Your Control\n"
+                        + "You can revoke Gmail access at any time from Google's account settings. "
+                        + "Deleting the app removes all locally stored data.\n\n"
+                        + "If you have questions, contact us at spotmydime.app@gmail.com."));
+        findViewById(R.id.btn_settings_about).setOnClickListener(v -> showSupportDialog("About SpotMyDime",
+                "Version 1.0.0\n\n"
+                        + "SpotMyDime is a smart, privacy-first expense tracker that helps you take control of your finances. "
+                        + "Built with a focus on local processing and data privacy, it uses on-device AI to automatically "
+                        + "detect and categorize transactions from your Gmail inbox.\n\n"
+                        + "Key Features:\n"
+                        + "• Automatic transaction detection from email receipts\n"
+                        + "• Smart AI categorization into spending categories\n"
+                        + "• Interactive spending insights and trends\n"
+                        + "• Recurring subscription detection\n"
+                        + "• Custom budget goals and tracking\n"
+                        + "• Merchant nickname management\n"
+                        + "• Manual expense and income entry\n\n"
+                        + "Developed with care for your financial well-being.\n"
+                        + "Contact: spotmydime.app@gmail.com"));
     }
 
     private void setupSettingsBackButtons() {
@@ -2285,6 +2336,7 @@ public class HomeActivity extends AppCompatActivity {
         findViewById(R.id.btn_edit_category_back).setOnClickListener(v -> showSettingsScreen(containerSettingsCategories));
         findViewById(R.id.btn_auto_tracking_back).setOnClickListener(v -> showSettingsScreen(containerSettingsMain));
         findViewById(R.id.btn_mail_scanning_back).setOnClickListener(v -> showSettingsScreen(containerSettingsMain));
+        findViewById(R.id.btn_feedback_back).setOnClickListener(v -> showSettingsScreen(containerSettingsMain));
     }
 
     private void showSettingsScreen(LinearLayout target) {
@@ -2296,6 +2348,103 @@ public class HomeActivity extends AppCompatActivity {
         containerSettingsEditCategory.setVisibility(target == containerSettingsEditCategory ? View.VISIBLE : View.GONE);
         containerSettingsAutoTracking.setVisibility(target == containerSettingsAutoTracking ? View.VISIBLE : View.GONE);
         containerSettingsMailScanning.setVisibility(target == containerSettingsMailScanning ? View.VISIBLE : View.GONE);
+        containerSettingsFeedback.setVisibility(target == containerSettingsFeedback ? View.VISIBLE : View.GONE);
+    }
+
+    private void showSupportDialog(String title, String message) {
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setBackgroundColor(0xFFFCF8F2);
+        layout.setPadding(dp(40), dp(28), dp(40), dp(28));
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText(title);
+        tvTitle.setTextColor(0xFF000000);
+        tvTitle.setTextSize(22);
+        tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+        tvTitle.setGravity(android.view.Gravity.CENTER);
+        layout.addView(tvTitle);
+
+        TextView tvMsg = new TextView(this);
+        tvMsg.setText(message);
+        tvMsg.setTextColor(0xFF333333);
+        tvMsg.setTextSize(14);
+        tvMsg.setLineSpacing(dp(4), 1);
+        tvMsg.setPadding(0, dp(20), 0, dp(24));
+        layout.addView(tvMsg);
+
+        TextView btnGotIt = new TextView(this);
+        btnGotIt.setText("Got it");
+        btnGotIt.setTextColor(0xFFF9A84D);
+        btnGotIt.setTextSize(16);
+        btnGotIt.setTypeface(null, android.graphics.Typeface.BOLD);
+        btnGotIt.setGravity(android.view.Gravity.CENTER);
+        btnGotIt.setBackgroundColor(0xFFFFFFFF);
+        btnGotIt.setPadding(0, dp(14), 0, dp(14));
+        btnGotIt.setClickable(true);
+        btnGotIt.setFocusable(true);
+        btnGotIt.setForeground(ContextCompat.getDrawable(this, R.drawable.input_outline));
+        layout.addView(btnGotIt);
+
+        android.app.AlertDialog dialog = new android.app.AlertDialog.Builder(this).setView(layout).create();
+        dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0xFFFCF8F2));
+        btnGotIt.setOnClickListener(v -> dialog.dismiss());
+        dialog.show();
+    }
+
+    private void setupFeedbackScreen() {
+        final String[] features = {
+                "General Feedback",
+                "Home Dashboard",
+                "Transactions",
+                "Add Expense/Income",
+                "Insights & Charts",
+                "Settings & Categories",
+                "Email Scanning",
+                "Subscriptions",
+                "Budget Goals",
+                "Merchant Nicknames",
+                "Other"
+        };
+        final int[] selectedFeatureIndex = {0};
+        TextView tvFeature = findViewById(R.id.tv_feedback_feature);
+        tvFeature.setOnClickListener(v -> {
+            new AlertDialog.Builder(this)
+                    .setTitle("Select Feature")
+                    .setSingleChoiceItems(features, selectedFeatureIndex[0], (dialog, which) -> {
+                        selectedFeatureIndex[0] = which;
+                        tvFeature.setText(features[which]);
+                        tvFeature.setTextColor(0xFF111111);
+                        dialog.dismiss();
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+        });
+
+        findViewById(R.id.btn_feedback_send).setOnClickListener(v -> {
+            String subject = ((EditText) findViewById(R.id.et_feedback_subject)).getText().toString().trim();
+            String message = ((EditText) findViewById(R.id.et_feedback_message)).getText().toString().trim();
+            String feature = features[selectedFeatureIndex[0]];
+            if (subject.isEmpty()) {
+                Toast.makeText(this, "Please enter a subject", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (message.isEmpty()) {
+                Toast.makeText(this, "Please write a message", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            String fullSubject = "[SpotMyDime Feedback - " + feature + "] " + subject;
+            Intent intent = new Intent(Intent.ACTION_SENDTO);
+            intent.setData(Uri.parse("mailto:"));
+            intent.putExtra(Intent.EXTRA_EMAIL, new String[]{"spotmydime.app@gmail.com"});
+            intent.putExtra(Intent.EXTRA_SUBJECT, fullSubject);
+            intent.putExtra(Intent.EXTRA_TEXT, message + "\n\n---\nSent via SpotMyDime v1.0.0");
+            try {
+                startActivity(Intent.createChooser(intent, "Send feedback via"));
+            } catch (Exception e) {
+                Toast.makeText(this, "No email app found", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void loadSettingsSubscriptions() {
@@ -2349,8 +2498,11 @@ public class HomeActivity extends AppCompatActivity {
             }
         }
 
+        Set<String> excluded = loadExcludedSubscriptions();
         List<Map<String, String>> result = new ArrayList<>();
         for (String key : merchantAmounts.keySet()) {
+            if (excluded.contains(key)) continue;
+
             List<Double> amounts = merchantAmounts.get(key);
             List<Long> dates = merchantDates.get(key);
             if (amounts.size() < 2) continue;
@@ -2364,6 +2516,44 @@ public class HomeActivity extends AppCompatActivity {
             if (maxDev > avgAmount * 0.5) continue;
 
             Collections.sort(dates);
+
+            // Check same day-of-month appears in 2+ different months
+            Set<Integer> dayOfMonthSet = new HashSet<>();
+            Set<String> monthYearSet = new HashSet<>();
+            for (long d : dates) {
+                Calendar cal = Calendar.getInstance();
+                cal.setTimeInMillis(d);
+                int day = cal.get(Calendar.DAY_OF_MONTH);
+                // Allow 1 day variance (e.g. weekend shifting)
+                dayOfMonthSet.add(day);
+                dayOfMonthSet.add(day - 1);
+                dayOfMonthSet.add(day + 1);
+                String my = cal.get(Calendar.YEAR) + "-" + cal.get(Calendar.MONTH);
+                monthYearSet.add(my);
+            }
+
+            if (monthYearSet.size() < 2) continue;
+
+            // Only count as recurring if same approximate day across months
+            boolean sameDayPattern = false;
+            int[] checkDays = {0, 0, 0}; // count for day, day-1, day+1
+            for (long d : dates) {
+                Calendar cal = Calendar.getInstance();
+                cal.setTimeInMillis(d);
+                int day = cal.get(Calendar.DAY_OF_MONTH);
+                for (int di = -1; di <= 1; di++) {
+                    if (dayOfMonthSet.contains(day + di)) {
+                        checkDays[di + 1]++;
+                    }
+                }
+            }
+            int maxCount = 0;
+            for (int c : checkDays) maxCount = Math.max(maxCount, c);
+            if (maxCount < 2) continue;
+            sameDayPattern = true;
+
+            if (!sameDayPattern) continue;
+
             long minGap = Long.MAX_VALUE;
             long totalGap = 0;
             int gapCount = 0;
@@ -2393,6 +2583,7 @@ public class HomeActivity extends AppCompatActivity {
             sub.put("amount", String.format("%.2f", avgAmount));
             sub.put("frequency", freq);
             sub.put("nextDate", nextDisplay);
+            sub.put("key", key);
             result.add(sub);
         }
 
@@ -2454,6 +2645,30 @@ public class HomeActivity extends AppCompatActivity {
         tvDetail.setTextColor(0xFF888888);
         textCol.addView(tvDetail);
         row.addView(textCol);
+        TextView btnDelete = new TextView(this);
+        btnDelete.setText("Delete");
+        btnDelete.setTextSize(13);
+        btnDelete.setTextColor(0xFFE53935);
+        btnDelete.setTypeface(null, android.graphics.Typeface.BOLD);
+        btnDelete.setPadding(dp(12), dp(8), dp(12), dp(8));
+        btnDelete.setClickable(true);
+        btnDelete.setFocusable(true);
+        final String subKey = sub.containsKey("key") ? sub.get("key") : null;
+        btnDelete.setOnClickListener(v -> {
+            new AlertDialog.Builder(this)
+                    .setTitle("Delete Subscription")
+                    .setMessage("Remove \"" + sub.get("name") + "\"? It will not be detected again.")
+                    .setPositiveButton("Delete", (dialog, which) -> {
+                        if (subKey != null) {
+                            saveExcludedSubscription(subKey);
+                        }
+                        loadSettingsSubscriptions();
+                        Toast.makeText(this, "Subscription removed", Toast.LENGTH_SHORT).show();
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+        });
+        row.addView(btnDelete);
         card.addView(row);
         return card;
     }
@@ -2534,20 +2749,143 @@ public class HomeActivity extends AppCompatActivity {
     private void loadSettingsBudgetGoals() {
         LinearLayout list = findViewById(R.id.container_budget_list);
         list.removeAllViews();
-        if (budgets.isEmpty()) {
-            budgets.put("Food & Dining", 600.0);
-            budgets.put("Shopping", 300.0);
-            budgets.put("Transportation", 150.0);
-            budgets.put("Entertainment", 100.0);
-        }
-        int[] catColors = {0xFF29B6F6, 0xFFFFA726, 0xFFE53935, 0xFF26A69A};
+        Map<String, Double> defs = loadBudgetDefs();
+        int[] catColors = {0xFF29B6F6, 0xFFFFA726, 0xFF8E24AA, 0xFFE53935, 0xFF5C6BC0, 0xFF26A69A, 0xFF4CAF50, 0xFFEF5350};
         int ci = 0;
-        for (Map.Entry<String, Double> entry : budgets.entrySet()) {
-            list.addView(createBudgetCard(entry.getKey(), entry.getValue(), catColors[ci % catColors.length]));
+        budgets.clear();
+        for (Map.Entry<String, Double> entry : defs.entrySet()) {
+            budgets.put(entry.getKey(), entry.getValue());
+            final String cat = entry.getKey();
+            final double budget = entry.getValue();
+            final int color = catColors[ci % catColors.length];
+            View card = createBudgetCard(cat, budget, color);
+            card.setOnClickListener(v -> showEditBudgetDialog(cat, budget));
+            card.setOnLongClickListener(v -> {
+                showDeleteBudgetDialog(cat);
+                return true;
+            });
+            list.addView(card);
             ci++;
         }
-        findViewById(R.id.btn_add_budget).setOnClickListener(v ->
-                Toast.makeText(this, "Add budget goal - coming soon", Toast.LENGTH_SHORT).show());
+        if (defs.isEmpty()) {
+            TextView empty = new TextView(this);
+            empty.setText("No budget goals set.\nTap + to add one.");
+            empty.setTextColor(0xFF888888);
+            empty.setTextSize(14);
+            empty.setGravity(android.view.Gravity.CENTER);
+            empty.setPadding(0, dp(24), 0, dp(24));
+            list.addView(empty);
+        }
+        findViewById(R.id.btn_add_budget).setOnClickListener(v -> showAddBudgetDialog());
+    }
+
+    private void showAddBudgetDialog() {
+        List<Map<String, Object>> catDefs = loadCategoryDefs();
+        String[] catNames = new String[catDefs.size()];
+        for (int i = 0; i < catDefs.size(); i++) {
+            catNames[i] = (String) catDefs.get(i).get("name");
+        }
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(dp(24), dp(16), dp(24), dp(16));
+        final int[] selectedCat = {0};
+        TextView tvCat = new TextView(this);
+        tvCat.setText("Category: " + catNames[0]);
+        tvCat.setTextSize(15);
+        tvCat.setTextColor(0xFF111111);
+        tvCat.setBackgroundResource(R.drawable.input_outline);
+        tvCat.setPadding(dp(16), dp(12), dp(16), dp(12));
+        tvCat.setClickable(true);
+        tvCat.setFocusable(true);
+        tvCat.setOnClickListener(v -> {
+            new AlertDialog.Builder(this)
+                    .setTitle("Select Category")
+                    .setItems(catNames, (dialog, which) -> {
+                        selectedCat[0] = which;
+                        tvCat.setText("Category: " + catNames[which]);
+                    })
+                    .show();
+        });
+        layout.addView(tvCat);
+        EditText etAmount = new EditText(this);
+        etAmount.setHint("Budget amount ($)");
+        etAmount.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        etAmount.setTextSize(15);
+        etAmount.setBackgroundResource(R.drawable.input_outline);
+        etAmount.setPadding(dp(16), dp(12), dp(16), dp(12));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(12);
+        etAmount.setLayoutParams(lp);
+        layout.addView(etAmount);
+        new AlertDialog.Builder(this)
+                .setTitle("Add Budget Goal")
+                .setView(layout)
+                .setPositiveButton("Add", (dialog, which) -> {
+                    String amtStr = etAmount.getText().toString().trim();
+                    if (amtStr.isEmpty()) {
+                        Toast.makeText(this, "Enter a budget amount", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    double amt;
+                    try { amt = Double.parseDouble(amtStr); } catch (Exception e) {
+                        Toast.makeText(this, "Invalid amount", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    Map<String, Double> defs = loadBudgetDefs();
+                    defs.put(catNames[selectedCat[0]], amt);
+                    saveBudgetDefs(defs);
+                    loadSettingsBudgetGoals();
+                    Toast.makeText(this, "Budget goal added", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void showEditBudgetDialog(String category, double currentBudget) {
+        EditText etAmount = new EditText(this);
+        etAmount.setText(String.format("%.0f", currentBudget));
+        etAmount.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        etAmount.setTextSize(15);
+        etAmount.setBackgroundResource(R.drawable.input_outline);
+        etAmount.setPadding(dp(16), dp(12), dp(16), dp(12));
+        new AlertDialog.Builder(this)
+                .setTitle("Edit Budget: " + category)
+                .setView(etAmount)
+                .setPositiveButton("Save", (dialog, which) -> {
+                    String amtStr = etAmount.getText().toString().trim();
+                    if (amtStr.isEmpty()) {
+                        Toast.makeText(this, "Enter a budget amount", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    double amt;
+                    try { amt = Double.parseDouble(amtStr); } catch (Exception e) {
+                        Toast.makeText(this, "Invalid amount", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    Map<String, Double> defs = loadBudgetDefs();
+                    defs.put(category, amt);
+                    saveBudgetDefs(defs);
+                    loadSettingsBudgetGoals();
+                    Toast.makeText(this, "Budget updated", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void showDeleteBudgetDialog(String category) {
+        new AlertDialog.Builder(this)
+                .setTitle("Delete Budget")
+                .setMessage("Remove budget goal for \"" + category + "\"?")
+                .setPositiveButton("Delete", (dialog, which) -> {
+                    Map<String, Double> defs = loadBudgetDefs();
+                    defs.remove(category);
+                    saveBudgetDefs(defs);
+                    budgets.remove(category);
+                    loadSettingsBudgetGoals();
+                    Toast.makeText(this, "Budget removed", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     private View createBudgetCard(String category, double budget, int color) {
@@ -2590,10 +2928,17 @@ public class HomeActivity extends AppCompatActivity {
             barOuter.setClipToOutline(true);
         }
         double spent = 0;
-        if (category.equals("Food & Dining")) spent = budget * 0.72;
-        else if (category.equals("Shopping")) spent = budget * 0.45;
-        else if (category.equals("Transportation")) spent = budget * 0.3;
-        else if (category.equals("Entertainment")) spent = budget * 0.9;
+        if (allTransactions != null) {
+            long monthStart = getMonthStartMillis();
+            for (Transaction t : allTransactions) {
+                if (t.getDateMillis() >= monthStart && t.getType() == Transaction.Type.OUTGOING) {
+                    String tCat = t.getCategory();
+                    if (tCat != null && tCat.equalsIgnoreCase(category)) {
+                        spent += t.getAmount();
+                    }
+                }
+            }
+        }
         float fillPct = (float) Math.min(spent / budget, 1.0);
         View fill = new View(this);
         fill.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, fillPct));
@@ -2709,9 +3054,16 @@ public class HomeActivity extends AppCompatActivity {
         btnDelete.setClickable(true);
         btnDelete.setFocusable(true);
         btnDelete.setOnClickListener(v -> {
-            aliasStore.setAlias(original, null);
-            loadSettingsNicknames();
-            Toast.makeText(this, "Nickname removed", Toast.LENGTH_SHORT).show();
+            new AlertDialog.Builder(this)
+                    .setTitle("Delete Nickname")
+                    .setMessage("Remove nickname for \"" + original + "\"?")
+                    .setPositiveButton("Delete", (dialog, which) -> {
+                        aliasStore.removeAlias(original);
+                        loadSettingsNicknames();
+                        Toast.makeText(this, "Nickname removed", Toast.LENGTH_SHORT).show();
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
         });
         row.addView(btnDelete);
         card.addView(row);
@@ -3373,6 +3725,127 @@ public class HomeActivity extends AppCompatActivity {
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // TRANSACTION CACHE
+    // ════════════════════════════════════════════════════════════════
+
+    private void saveTransactionsToCache(List<Transaction> list) {
+        try {
+            JSONArray arr = new JSONArray();
+            for (Transaction t : list) {
+                JSONObject o = new JSONObject();
+                o.put("merchant", t.getMerchant());
+                o.put("amount", t.getAmount());
+                o.put("dateMillis", t.getDateMillis());
+                o.put("dateDisplay", t.getDateDisplay());
+                o.put("category", t.getCategory());
+                o.put("avatarLetter", String.valueOf(t.getAvatarLetter()));
+                o.put("type", t.getType() == Transaction.Type.INCOMING ? "incoming" : "outgoing");
+                o.put("senderEmail", t.getSenderEmail() != null ? t.getSenderEmail() : "");
+                o.put("subject", t.getSubject() != null ? t.getSubject() : "");
+                o.put("messageId", t.getMessageId() != null ? t.getMessageId() : "");
+                o.put("rawVendor", t.getRawVendor() != null ? t.getRawVendor() : "");
+                arr.put(o);
+            }
+            settingsPrefs.edit().putString("cached_transactions", arr.toString()).apply();
+            settingsPrefs.edit().putLong("last_fetch_time", System.currentTimeMillis()).apply();
+        } catch (Exception ignored) {}
+    }
+
+    private List<Transaction> loadTransactionsFromCache() {
+        String json = settingsPrefs.getString("cached_transactions", null);
+        if (json == null) return null;
+        try {
+            JSONArray arr = new JSONArray(json);
+            List<Transaction> list = new ArrayList<>();
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.getJSONObject(i);
+                String type = o.optString("type", "outgoing");
+                String avatarStr = o.optString("avatarLetter", "?");
+                Transaction t = new Transaction(
+                        o.optString("merchant", ""),
+                        o.optDouble("amount", 0),
+                        o.optLong("dateMillis", System.currentTimeMillis()),
+                        o.optString("dateDisplay", ""),
+                        o.optString("category", "Other"),
+                        avatarStr.isEmpty() ? '?' : avatarStr.charAt(0),
+                        "incoming".equals(type) ? Transaction.Type.INCOMING : Transaction.Type.OUTGOING,
+                        o.optString("senderEmail", null),
+                        o.optString("subject", null),
+                        o.optString("messageId", null),
+                        o.optString("rawVendor", null)
+                );
+                list.add(t);
+            }
+            return list;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // BUDGET GOALS persistence
+    // ════════════════════════════════════════════════════════════════
+
+    private Map<String, Double> loadBudgetDefs() {
+        String json = settingsPrefs.getString("budget_defs", null);
+        if (json == null) {
+            Map<String, Double> defaults = new HashMap<>();
+            defaults.put("Food & Dining", 600.0);
+            defaults.put("Shopping", 300.0);
+            defaults.put("Transportation", 150.0);
+            defaults.put("Entertainment", 100.0);
+            saveBudgetDefs(defaults);
+            return defaults;
+        }
+        Map<String, Double> result = new HashMap<>();
+        try {
+            JSONObject obj = new JSONObject(json);
+            Iterator<String> keys = obj.keys();
+            while (keys.hasNext()) {
+                String k = keys.next();
+                result.put(k, obj.getDouble(k));
+            }
+        } catch (Exception ignored) {}
+        return result;
+    }
+
+    private void saveBudgetDefs(Map<String, Double> defs) {
+        try {
+            JSONObject obj = new JSONObject();
+            for (Map.Entry<String, Double> e : defs.entrySet()) {
+                obj.put(e.getKey(), e.getValue());
+            }
+            settingsPrefs.edit().putString("budget_defs", obj.toString()).apply();
+        } catch (Exception ignored) {}
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // EXCLUDED SUBSCRIPTIONS persistence
+    // ════════════════════════════════════════════════════════════════
+
+    private Set<String> loadExcludedSubscriptions() {
+        String json = settingsPrefs.getString("excluded_subscriptions", "[]");
+        Set<String> set = new HashSet<>();
+        try {
+            JSONArray arr = new JSONArray(json);
+            for (int i = 0; i < arr.length(); i++) {
+                set.add(arr.getString(i).toLowerCase().trim());
+            }
+        } catch (Exception ignored) {}
+        return set;
+    }
+
+    private void saveExcludedSubscription(String merchant) {
+        Set<String> excluded = loadExcludedSubscriptions();
+        excluded.add(merchant.toLowerCase().trim());
+        try {
+            JSONArray arr = new JSONArray();
+            for (String s : excluded) arr.put(s);
+            settingsPrefs.edit().putString("excluded_subscriptions", arr.toString()).apply();
+        } catch (Exception ignored) {}
     }
 
 }

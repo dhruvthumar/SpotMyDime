@@ -33,6 +33,13 @@ public class VendorAliasStore {
         save(all);
     }
 
+    public void removeAlias(String original) {
+        if (original == null) return;
+        Map<String, String> all = load();
+        all.remove(original);
+        save(all);
+    }
+
     public Map<String, String> getAll() {
         return load();
     }

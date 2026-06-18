@@ -58,6 +58,11 @@ public class GmailFetcher {
     // ── Fetch entry point ─────────────────────────────────────────────────────
 
     public static void fetchTransactions(Context context, Callback callback) {
+        fetchTransactions(context, callback, null);
+    }
+
+    public static void fetchTransactions(Context context, Callback callback, String afterDate) {
+        final String effectiveAfter = (afterDate != null) ? afterDate : "2026/01/01";
         new Thread(() -> {
             try {
                 GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(context);
@@ -86,7 +91,7 @@ public class GmailFetcher {
                     return;
                 }
 
-                String query = "after:2026/01/01"
+                String query = "after:" + effectiveAfter
                         + " ($ OR total OR amount OR paid OR charged OR receipt OR invoice"
                         + " OR \"order confirmation\" OR \"your order\" OR \"payment received\""
                         + " OR \"you've received\" OR \"e-transfer\" OR refund OR subscription)";
