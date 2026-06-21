@@ -1,4 +1,114 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE FrameLayout [
+        <!ELEMENT FrameLayout (LinearLayout)*>
+        <!ATTLIST FrameLayout
+                xmlns:android CDATA #REQUIRED
+                xmlns:app CDATA #REQUIRED
+                android:layout_width CDATA #REQUIRED
+                android:layout_height CDATA #REQUIRED
+                android:background CDATA #REQUIRED>
+        <!ELEMENT LinearLayout (RelativeLayout|LinearLayout|ImageView|TextView|androidx.cardview.widget.CardView|View|EditText|androidx.appcompat.widget.SwitchCompat)*>
+        <!ATTLIST LinearLayout
+                android:background CDATA #IMPLIED
+                android:clickable CDATA #IMPLIED
+                android:focusable CDATA #IMPLIED
+                android:foreground CDATA #IMPLIED
+                android:gravity CDATA #IMPLIED
+                android:id CDATA #IMPLIED
+                android:layout_height CDATA #REQUIRED
+                android:layout_marginTop CDATA #IMPLIED
+                android:layout_weight CDATA #IMPLIED
+                android:layout_width CDATA #REQUIRED
+                android:orientation CDATA #IMPLIED
+                android:padding CDATA #IMPLIED
+                android:paddingBottom CDATA #IMPLIED
+                android:paddingHorizontal CDATA #IMPLIED
+                android:paddingStart CDATA #IMPLIED
+                android:visibility CDATA #IMPLIED>
+        <!ELEMENT RelativeLayout (ImageView|TextView)*>
+        <!ATTLIST RelativeLayout
+                android:layout_height CDATA #REQUIRED
+                android:layout_marginTop CDATA #REQUIRED
+                android:layout_width CDATA #REQUIRED
+                android:paddingHorizontal CDATA #REQUIRED>
+        <!ELEMENT ImageView (#PCDATA)>
+        <!ATTLIST ImageView
+                android:background CDATA #IMPLIED
+                android:contentDescription CDATA #REQUIRED
+                android:id CDATA #REQUIRED
+                android:layout_alignParentStart CDATA #IMPLIED
+                android:layout_centerVertical CDATA #IMPLIED
+                android:layout_height CDATA #REQUIRED
+                android:layout_width CDATA #REQUIRED
+                android:padding CDATA #IMPLIED
+                android:src CDATA #IMPLIED>
+        <!ELEMENT TextView (#PCDATA)>
+        <!ATTLIST TextView
+                android:background CDATA #IMPLIED
+                android:clickable CDATA #IMPLIED
+                android:focusable CDATA #IMPLIED
+                android:foreground CDATA #IMPLIED
+                android:gravity CDATA #IMPLIED
+                android:hint CDATA #IMPLIED
+                android:id CDATA #IMPLIED
+                android:layout_centerInParent CDATA #IMPLIED
+                android:layout_gravity CDATA #IMPLIED
+                android:layout_height CDATA #REQUIRED
+                android:layout_marginBottom CDATA #IMPLIED
+                android:layout_marginEnd CDATA #IMPLIED
+                android:layout_marginHorizontal CDATA #IMPLIED
+                android:layout_marginStart CDATA #IMPLIED
+                android:layout_marginTop CDATA #IMPLIED
+                android:layout_weight CDATA #IMPLIED
+                android:layout_width CDATA #REQUIRED
+                android:paddingHorizontal CDATA #IMPLIED
+                android:text CDATA #IMPLIED
+                android:textColor CDATA #REQUIRED
+                android:textColorHint CDATA #IMPLIED
+                android:textSize CDATA #REQUIRED
+                android:textStyle CDATA #IMPLIED>
+        <!ELEMENT androidx.cardview.widget.CardView (LinearLayout)*>
+        <!ATTLIST androidx.cardview.widget.CardView
+                android:foreground CDATA #IMPLIED
+                android:layout_height CDATA #REQUIRED
+                android:layout_marginBottom CDATA #IMPLIED
+                android:layout_marginHorizontal CDATA #IMPLIED
+                android:layout_marginTop CDATA #IMPLIED
+                android:layout_width CDATA #REQUIRED
+                app:cardBackgroundColor CDATA #REQUIRED
+                app:cardCornerRadius CDATA #REQUIRED
+                app:cardElevation CDATA #REQUIRED
+                app:cardUseCompatPadding CDATA #IMPLIED>
+        <!ELEMENT View (#PCDATA)>
+        <!ATTLIST View
+                android:background CDATA #REQUIRED
+                android:layout_height CDATA #REQUIRED
+                android:layout_marginHorizontal CDATA #IMPLIED
+                android:layout_width CDATA #REQUIRED>
+        <!ELEMENT EditText (#PCDATA)>
+        <!ATTLIST EditText
+                android:background CDATA #REQUIRED
+                android:gravity CDATA #REQUIRED
+                android:hint CDATA #IMPLIED
+                android:id CDATA #REQUIRED
+                android:inputType CDATA #IMPLIED
+                android:layout_height CDATA #REQUIRED
+                android:layout_marginBottom CDATA #REQUIRED
+                android:layout_marginTop CDATA #REQUIRED
+                android:layout_width CDATA #REQUIRED
+                android:paddingHorizontal CDATA #REQUIRED
+                android:paddingVertical CDATA #IMPLIED
+                android:textColor CDATA #REQUIRED
+                android:textColorHint CDATA #IMPLIED
+                android:textSize CDATA #REQUIRED>
+        <!ELEMENT androidx.appcompat.widget.SwitchCompat (#PCDATA)>
+        <!ATTLIST androidx.appcompat.widget.SwitchCompat
+                android:id CDATA #REQUIRED
+                android:layout_height CDATA #REQUIRED
+                android:layout_width CDATA #REQUIRED
+                android:thumbTint CDATA #IMPLIED
+                android:trackTint CDATA #IMPLIED>
+        ]>
 <FrameLayout
         xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -773,15 +883,43 @@
                     android:id="@+id/container_color_picker"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center"
+                    android:orientation="vertical"
                     android:layout_marginTop="12dp" />
+
+            <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Merchants"
+                    android:textColor="#000000"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:layout_marginTop="24dp" />
+
+            <LinearLayout
+                    android:id="@+id/container_edit_category_merchants"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginTop="8dp" />
+
+            <TextView
+                    android:id="@+id/btn_edit_category_add_merchant"
+                    android:layout_width="wrap_content"
+                    android:layout_height="44dp"
+                    android:text="+ Add Merchant"
+                    android:textColor="#D4A373"
+                    android:textSize="14sp"
+                    android:gravity="center_vertical"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:layout_marginTop="4dp" />
 
             <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:layout_marginTop="32dp"
+                    android:layout_marginTop="24dp"
                     android:gravity="center_vertical">
 
                 <TextView

@@ -4,16 +4,20 @@
         xmlns:app="http://schemas.android.com/apk/res-auto"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#FCF8F2">
+        android:background="#FAF7F2">
+
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+            android:id="@+id/swipe_refresh"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
 
     <androidx.core.widget.NestedScrollView
             android:id="@+id/scroll_content"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:fillViewport="true"
-            android:clipToPadding="false"
-            android:paddingTop="32dp"
-            android:paddingBottom="88dp">
+            android:paddingTop="4dp"
+            android:paddingBottom="80dp">
 
         <LinearLayout
                 android:layout_width="match_parent"
@@ -21,7 +25,7 @@
                 android:orientation="vertical">
 
             <!-- ════════════════════════════════════════════════ -->
-            <!-- TAB 1 – HOME CONTENT                            -->
+            <!-- TAB 1 – HOME CONTENT (Redesigned)               -->
             <!-- ════════════════════════════════════════════════════ -->
             <LinearLayout
                     android:id="@+id/container_home"
@@ -29,102 +33,74 @@
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
 
-                <RelativeLayout
+                <!-- ═══ TOP APP BAR ═══ -->
+                <LinearLayout
                         android:layout_width="match_parent"
-                        android:layout_height="56dp"
-                        android:paddingHorizontal="20dp"
-                        android:layout_marginTop="16dp">
+                        android:layout_height="50dp"
+                        android:orientation="horizontal"
+                        android:gravity="center"
+                        android:background="#FAF7F2"
+                        android:paddingHorizontal="14dp">
 
-                    <ImageView
-                            android:id="@+id/btn_menu"
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:src="@android:drawable/ic_menu_sort_by_size"
-                            android:background="@drawable/circle_outline"
-                            android:padding="8dp"
-                            android:layout_centerVertical="true"
-                            android:layout_alignParentStart="true"
-                            android:contentDescription="Menu" />
-
-                    <LinearLayout
+                    <TextView
+                            android:id="@+id/tv_wordmark_spotmy"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:layout_centerInParent="true">
+                            android:text="SpotMy"
+                            android:textColor="#1A1A1A"
+                            android:textSize="20sp"
+                            android:textStyle="bold" />
 
-                        <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="SpotMy"
-                                android:textColor="#111111"
-                                android:textSize="20sp"
-                                android:textStyle="bold" />
+                    <TextView
+                            android:id="@+id/tv_wordmark_dime"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Dime"
+                            android:textColor="#1E7A4C"
+                            android:textSize="20sp"
+                            android:textStyle="bold"
+                            android:layout_marginStart="2dp" />
+                </LinearLayout>
 
-                        <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Dime"
-                                android:textColor="#2E7D32"
-                                android:textSize="20sp"
-                                android:textStyle="bold" />
-                    </LinearLayout>
-
-                    <ImageView
-                            android:id="@+id/btn_notifications"
-                            android:layout_width="40dp"
-                            android:layout_height="40dp"
-                            android:src="@android:drawable/ic_popup_reminder"
-                            android:background="@drawable/circle_outline"
-                            android:padding="8dp"
-                            android:layout_centerVertical="true"
-                            android:layout_alignParentEnd="true"
-                            android:contentDescription="Notifications" />
-                </RelativeLayout>
-
-                <TextView
-                        android:id="@+id/tv_greeting"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Hi there 👋"
-                        android:textColor="#111111"
-                        android:textSize="16sp"
-                        android:layout_marginStart="20dp"
-                        android:layout_marginTop="8dp" />
-
+                <!-- ═══ NET CASH FLOW CARD ═══ -->
                 <androidx.cardview.widget.CardView
+                        android:id="@+id/card_net_cashflow"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginHorizontal="20dp"
-                        android:layout_marginTop="16dp"
+                        android:layout_marginHorizontal="14dp"
+                        android:layout_marginTop="12dp"
                         app:cardBackgroundColor="#FFFFFF"
                         app:cardCornerRadius="16dp"
-                        app:cardElevation="4dp">
+                        app:cardElevation="4dp"
+                        app:cardUseCompatPadding="true">
 
                     <RelativeLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:padding="20dp">
+                            android:padding="18dp">
 
                         <LinearLayout
                                 android:id="@+id/ll_amount"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:orientation="vertical"
-                                android:layout_alignParentStart="true">
+                                android:layout_alignParentStart="true"
+                                android:layout_centerVertical="true">
 
                             <TextView
+                                    android:id="@+id/tv_month_label"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:text="This Month"
-                                    android:textColor="#888888"
-                                    android:textSize="13sp" />
+                                    android:textColor="#1A1A1A"
+                                    android:textSize="14sp" />
 
                             <TextView
                                     android:id="@+id/tv_total_amount"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:text="$0.00"
-                                    android:textColor="#111111"
+                                    android:textColor="#1A1A1A"
                                     android:textSize="32sp"
                                     android:textStyle="bold"
                                     android:layout_marginTop="4dp" />
@@ -133,61 +109,141 @@
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:text="Net Cash Flow"
-                                    android:textColor="#888888"
-                                    android:textSize="13sp" />
+                                    android:textColor="#6B6B6B"
+                                    android:textSize="14sp" />
 
                             <LinearLayout
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
                                     android:orientation="horizontal"
                                     android:gravity="center_vertical"
-                                    android:layout_marginTop="12dp">
+                                    android:layout_marginTop="8dp">
+
+                                <ImageView
+                                        android:id="@+id/iv_trend_arrow"
+                                        android:layout_width="16dp"
+                                        android:layout_height="16dp"
+                                        android:src="@drawable/ic_arrow_up"
+                                        android:contentDescription="Trend"
+                                        android:visibility="gone" />
 
                                 <TextView
                                         android:id="@+id/tv_trend"
                                         android:layout_width="wrap_content"
                                         android:layout_height="wrap_content"
                                         android:text=""
-                                        android:textColor="#2E7D32"
+                                        android:textColor="#1E7A4C"
                                         android:textSize="13sp"
+                                        android:paddingStart="4dp"
                                         android:visibility="gone" />
                             </LinearLayout>
                         </LinearLayout>
 
-                        <ImageView
-                                android:layout_width="80dp"
-                                android:layout_height="80dp"
-                                android:src="@android:drawable/ic_menu_report_image"
+                        <LinearLayout
+                                android:id="@+id/ll_income_expense"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
                                 android:layout_alignParentEnd="true"
                                 android:layout_centerVertical="true"
-                                android:contentDescription="Spending chart" />
+                                android:orientation="vertical"
+                                android:gravity="end">
+
+                            <LinearLayout
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="horizontal"
+                                    android:gravity="center_vertical">
+                                <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="Income"
+                                        android:textColor="#1E7A4C"
+                                        android:textSize="12sp"
+                                        android:textStyle="bold" />
+                                <ImageView
+                                        android:id="@+id/iv_income_arrow"
+                                        android:layout_width="18dp"
+                                        android:layout_height="18dp"
+                                        android:src="@drawable/ic_arrow_up"
+                                        android:contentDescription="Income"
+                                        android:layout_marginStart="4dp" />
+                            </LinearLayout>
+
+                            <TextView
+                                    android:id="@+id/tv_income_amount"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="$0.00"
+                                    android:textColor="#1E7A4C"
+                                    android:textSize="18sp"
+                                    android:textStyle="bold"
+                                    android:layout_marginTop="2dp" />
+
+                            <LinearLayout
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:orientation="horizontal"
+                                    android:gravity="center_vertical"
+                                    android:layout_marginTop="10dp">
+                                <TextView
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:text="Expense"
+                                        android:textColor="#E53935"
+                                        android:textSize="12sp"
+                                        android:textStyle="bold" />
+                                <ImageView
+                                        android:id="@+id/iv_expense_arrow"
+                                        android:layout_width="18dp"
+                                        android:layout_height="18dp"
+                                        android:src="@drawable/ic_arrow_down"
+                                        android:contentDescription="Expense"
+                                        android:layout_marginStart="4dp" />
+                            </LinearLayout>
+
+                            <TextView
+                                    android:id="@+id/tv_expense_amount"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="$0.00"
+                                    android:textColor="#E53935"
+                                    android:textSize="18sp"
+                                    android:textStyle="bold"
+                                    android:layout_marginTop="2dp" />
+                        </LinearLayout>
 
                     </RelativeLayout>
                 </androidx.cardview.widget.CardView>
 
+                <!-- ═══ TOP CATEGORIES SECTION ═══ -->
                 <RelativeLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:paddingHorizontal="20dp"
-                        android:layout_marginTop="24dp">
+                        android:paddingHorizontal="14dp"
+                        android:layout_marginTop="14dp">
 
                     <TextView
+                            android:id="@+id/tv_section_categories_title"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Top Categories"
-                            android:textColor="#111111"
-                            android:textSize="17sp"
+                            android:textColor="#1A1A1A"
+                            android:textSize="16sp"
                             android:textStyle="bold"
                             android:layout_alignParentStart="true" />
 
                     <TextView
+                            android:id="@+id/tv_section_categories_viewall"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="View all"
-                            android:textColor="#888888"
+                            android:textColor="#6B6B6B"
                             android:textSize="13sp"
                             android:layout_alignParentEnd="true"
-                            android:layout_centerVertical="true" />
+                            android:layout_centerVertical="true"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:foreground="?attr/selectableItemBackground" />
                 </RelativeLayout>
 
                 <LinearLayout
@@ -195,8 +251,47 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
-                        android:paddingHorizontal="20dp"
-                        android:layout_marginTop="12dp" />
+                        android:paddingHorizontal="14dp"
+                        android:layout_marginTop="6dp" />
+
+                <!-- ═══ RECENT TRANSACTIONS SECTION ═══ -->
+                <RelativeLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingHorizontal="14dp"
+                        android:layout_marginTop="14dp">
+
+                    <TextView
+                            android:id="@+id/tv_section_transactions_title"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Recent Transactions"
+                            android:textColor="#1A1A1A"
+                            android:textSize="16sp"
+                            android:textStyle="bold"
+                            android:layout_alignParentStart="true" />
+
+                    <TextView
+                            android:id="@+id/tv_section_transactions_viewall"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="View all"
+                            android:textColor="#6B6B6B"
+                            android:textSize="13sp"
+                            android:layout_alignParentEnd="true"
+                            android:layout_centerVertical="true"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:foreground="?attr/selectableItemBackground" />
+                </RelativeLayout>
+
+                <LinearLayout
+                        android:id="@+id/container_transactions_home"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingHorizontal="14dp"
+                        android:layout_marginTop="6dp" />
 
             </LinearLayout>
 
@@ -318,8 +413,8 @@
 
                         <ImageView
                                 android:id="@+id/iv_filter_all"
-                                android:layout_width="100dp"
-                                android:layout_height="100dp"
+                                android:layout_width="90dp"
+                                android:layout_height="90dp"
                                 android:src="@drawable/ic_filter_all"
                                 android:contentDescription="Show all transactions"
                                 android:adjustViewBounds="true"
@@ -1183,112 +1278,149 @@
 
     </androidx.core.widget.NestedScrollView>
 
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
     <!-- ════════════════════════════════════════════════════ -->
-    <!-- FLOATING NAVIGATION BAR                             -->
+    <!-- FLOATING NAVIGATION BAR (Redesigned)                -->
     <!-- ════════════════════════════════════════════════════ -->
     <LinearLayout
             android:id="@+id/bottom_nav"
             android:layout_width="match_parent"
-            android:layout_height="80dp"
+            android:layout_height="72dp"
             android:layout_gravity="bottom"
-            android:layout_marginHorizontal="20dp"
-            android:layout_marginBottom="20dp"
+            android:layout_marginHorizontal="14dp"
+            android:layout_marginBottom="12dp"
             android:orientation="horizontal"
             android:gravity="center"
             android:background="@drawable/nav_bar_bg"
-            android:elevation="8dp"
-            android:paddingHorizontal="6dp"
-            android:clipToPadding="false" android:outlineProvider="none">
+            android:paddingHorizontal="4dp"
+            android:clipToPadding="false"
+            android:outlineProvider="none">
 
-        <LinearLayout
-                android:id="@+id/nav_home"
+        <!-- HOME TAB -->
+        <FrameLayout
                 android:layout_width="0dp"
-                android:layout_height="60dp"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:orientation="horizontal"
-                android:gravity="center"
-                android:clickable="true"
-                android:focusable="true"
-                android:foreground="?attr/selectableItemBackground">
-            <ImageView
-                    android:id="@+id/ic_nav_home"
-                    android:layout_width="30dp"
-                    android:layout_height="30dp"
-                    android:src="@drawable/tab_1"
-                    android:contentDescription="Tab 1"/>
-        </LinearLayout>
+                android:gravity="center">
+            <LinearLayout
+                    android:id="@+id/nav_home"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:background="@drawable/nav_tab_circle_inactive"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground">
+                <ImageView
+                        android:id="@+id/ic_nav_home"
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:src="@drawable/ic_nav_home"
+                        android:contentDescription="Home"/>
+            </LinearLayout>
+        </FrameLayout>
 
-        <LinearLayout
-                android:id="@+id/nav_document"
+        <!-- TRANSACTIONS TAB -->
+        <FrameLayout
                 android:layout_width="0dp"
-                android:layout_height="60dp"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:orientation="horizontal"
-                android:gravity="center"
-                android:clickable="true"
-                android:focusable="true"
-                android:foreground="?attr/selectableItemBackground">
-            <ImageView
-                    android:id="@+id/ic_nav_document"
-                    android:layout_width="30dp"
-                    android:layout_height="30dp"
-                    android:src="@drawable/tab_2"
-                    android:contentDescription="Tab 2"/>
-        </LinearLayout>
+                android:gravity="center">
+            <LinearLayout
+                    android:id="@+id/nav_document"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:background="@drawable/nav_tab_circle_inactive"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground">
+                <ImageView
+                        android:id="@+id/ic_nav_document"
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:src="@drawable/ic_nav_document"
+                        android:contentDescription="Transactions"/>
+            </LinearLayout>
+        </FrameLayout>
 
-        <LinearLayout
-                android:id="@+id/nav_add"
+        <!-- ADD TAB -->
+        <FrameLayout
                 android:layout_width="0dp"
-                android:layout_height="60dp"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:orientation="horizontal"
-                android:gravity="center"
-                android:clickable="true"
-                android:focusable="true"
-                android:foreground="?attr/selectableItemBackground">
-            <ImageView
-                    android:id="@+id/ic_nav_add"
-                    android:layout_width="30dp"
-                    android:layout_height="30dp"
-                    android:src="@drawable/tab_3"
-                    android:contentDescription="Tab 3"/>
-        </LinearLayout>
+                android:gravity="center">
+            <LinearLayout
+                    android:id="@+id/nav_add"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:background="@drawable/nav_tab_circle_inactive"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground">
+                <ImageView
+                        android:id="@+id/ic_nav_add"
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:src="@drawable/ic_nav_add"
+                        android:contentDescription="Add Transaction"/>
+            </LinearLayout>
+        </FrameLayout>
 
-        <LinearLayout
-                android:id="@+id/nav_insights"
+        <!-- INSIGHTS TAB -->
+        <FrameLayout
                 android:layout_width="0dp"
-                android:layout_height="60dp"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:orientation="horizontal"
-                android:gravity="center"
-                android:clickable="true"
-                android:focusable="true"
-                android:foreground="?attr/selectableItemBackground">
-            <ImageView
-                    android:id="@+id/ic_nav_insights"
-                    android:layout_width="30dp"
-                    android:layout_height="30dp"
-                    android:src="@drawable/tab_4"
-                    android:contentDescription="Tab 4"/>
-        </LinearLayout>
+                android:gravity="center">
+            <LinearLayout
+                    android:id="@+id/nav_insights"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:background="@drawable/nav_tab_circle_inactive"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground">
+                <ImageView
+                        android:id="@+id/ic_nav_insights"
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:src="@drawable/ic_nav_gallery"
+                        android:contentDescription="Insights"/>
+            </LinearLayout>
+        </FrameLayout>
 
-        <LinearLayout
-                android:id="@+id/nav_settings"
+        <!-- SETTINGS TAB -->
+        <FrameLayout
                 android:layout_width="0dp"
-                android:layout_height="60dp"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:orientation="horizontal"
-                android:gravity="center"
-                android:clickable="true"
-                android:focusable="true"
-                android:foreground="?attr/selectableItemBackground">
-            <ImageView
-                    android:id="@+id/ic_nav_settings"
-                    android:layout_width="30dp"
-                    android:layout_height="30dp"
-                    android:src="@drawable/tab_5"
-                    android:contentDescription="Tab 5"/>
-        </LinearLayout>
+                android:gravity="center">
+            <LinearLayout
+                    android:id="@+id/nav_settings"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:background="@drawable/nav_tab_circle_inactive"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground">
+                <ImageView
+                        android:id="@+id/ic_nav_settings"
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:src="@drawable/ic_nav_settings"
+                        android:contentDescription="Settings"/>
+            </LinearLayout>
+        </FrameLayout>
 
     </LinearLayout>
 

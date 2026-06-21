@@ -24,12 +24,25 @@ import java.net.URL;
 public class GeminiClassifier {
 
     private static final String TAG = "GeminiClassifier";
-    private static final String MODEL = "gemini-2.0-flash";
+    private static final String MODEL = "gemini-2.5-flash";
     private static final String API_URL =
             "https://generativelanguage.googleapis.com/v1beta/models/" + MODEL + ":generateContent?key=";
 
     /** Set from HomeActivity.onCreate via BuildConfig or strings.xml. */
     public static String apiKey = "";
+
+    /** Minimum ms between API calls to avoid hitting rate limits. */
+    private static final long MIN_INTERVAL_MS = 1200; // ~50 RPM
+    private static long lastCallTime = 0;
+
+    private static void throttle() {
+        long now = System.currentTimeMillis();
+        long wait = MIN_INTERVAL_MS - (now - lastCallTime);
+        if (wait > 0) {
+            try { Thread.sleep(wait); } catch (InterruptedException ignored) {}
+        }
+        lastCallTime = System.currentTimeMillis();
+    }
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -60,6 +73,7 @@ public class GeminiClassifier {
 
         try {
             Log.d(TAG, "Gemini call — subject: " + subject);
+            throttle();
             String requestJson = buildRequest(prompt);
             String responseJson = postJson(API_URL + apiKey, requestJson);
 
@@ -128,6 +142,7 @@ public class GeminiClassifier {
     public static String generateText(String prompt) {
         if (apiKey == null || apiKey.isEmpty()) return null;
         try {
+            throttle();
             String requestJson = buildRequest(prompt);
             String responseJson = postJson(API_URL + apiKey, requestJson);
             if (responseJson == null) return null;
@@ -178,32 +193,43 @@ public class GeminiClassifier {
     }
 
     private static String postJson(String urlStr, String json) throws Exception {
-        HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
-        conn.setRequestMethod("POST");
-        conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-        conn.setConnectTimeout(20000);
-        conn.setReadTimeout(20000);
-        conn.setDoOutput(true);
+        int maxRetries = 3;
+        for (int attempt = 0; attempt < maxRetries; attempt++) {
+            HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+            conn.setConnectTimeout(20000);
+            conn.setReadTimeout(20000);
+            conn.setDoOutput(true);
 
-        try (OutputStream os = conn.getOutputStream()) {
-            os.write(json.getBytes("UTF-8"));
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(json.getBytes("UTF-8"));
+            }
+
+            int code = conn.getResponseCode();
+            Log.d(TAG, "HTTP " + code + " (attempt " + (attempt + 1) + "/" + maxRetries + ")");
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(
+                    code >= 400 ? conn.getErrorStream() : conn.getInputStream(), "UTF-8"));
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) sb.append(line);
+            reader.close();
+
+            if (code == 429 && attempt < maxRetries - 1) {
+                long backoff = (long) Math.pow(2, attempt) * 1000 + (long) (Math.random() * 500);
+                Log.w(TAG, "429 rate limited — retrying in " + backoff + "ms");
+                Thread.sleep(backoff);
+                continue;
+            }
+
+            if (code >= 400) {
+                Log.w(TAG, "Gemini HTTP " + code + ": " + sb);
+                return null;
+            }
+            return sb.toString();
         }
-
-        int code = conn.getResponseCode();
-        Log.d(TAG, "HTTP " + code);
-
-        BufferedReader reader = new BufferedReader(new InputStreamReader(
-                code >= 400 ? conn.getErrorStream() : conn.getInputStream(), "UTF-8"));
-        StringBuilder sb = new StringBuilder();
-        String line;
-        while ((line = reader.readLine()) != null) sb.append(line);
-        reader.close();
-
-        if (code >= 400) {
-            Log.w(TAG, "Gemini HTTP " + code + ": " + sb);
-            return null;
-        }
-        return sb.toString();
+        return null;
     }
 
     private static ClassificationResult parseResponse(String response) {

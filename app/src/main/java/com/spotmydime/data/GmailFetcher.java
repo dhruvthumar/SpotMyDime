@@ -97,7 +97,7 @@ public class GmailFetcher {
                         + " OR \"you've received\" OR \"e-transfer\" OR refund OR subscription)";
 
                 String listUrl = GMAIL_API + "/messages?q="
-                        + java.net.URLEncoder.encode(query, "UTF-8") + "&maxResults=500";
+                        + java.net.URLEncoder.encode(query, "UTF-8") + "&maxResults=100";
 
                 JSONObject listObj = new JSONObject(executeGet(listUrl, token));
                 JSONArray messages = listObj.optJSONArray("messages");
@@ -114,9 +114,10 @@ public class GmailFetcher {
                 VendorAliasStore aliasStore       = new VendorAliasStore(context);
                 TransactionOverrideStore overrides = new TransactionOverrideStore(context);
                 ExcludedMessageStore excluded     = new ExcludedMessageStore(context);
+                AiResultCache aiCache             = new AiResultCache(context);
 
                 List<Transaction> results = new ArrayList<>();
-                int max = Math.min(messages.length(), 200);
+                int max = Math.min(messages.length(), 60);
 
                 for (int i = 0; i < max; i++) {
                     String msgId = messages.getJSONObject(i).getString("id");
@@ -125,7 +126,7 @@ public class GmailFetcher {
                     String msgJson = executeGet(
                             GMAIL_API + "/messages/" + msgId + "?format=full", token);
 
-                    Transaction t = parseMessage(msgJson, vendorStore, aliasStore, overrides, msgId);
+                    Transaction t = parseMessage(msgJson, vendorStore, aliasStore, overrides, aiCache, msgId);
                     if (t != null) {
                         results.add(t);
                         Log.d(TAG, "OK  " + t.getMerchant()
@@ -185,7 +186,13 @@ public class GmailFetcher {
 
             } catch (Exception e) {
                 Log.e(TAG, "Fetch failed", e);
-                callback.onError("Error: " + e.getClass().getSimpleName() + " — " + e.getMessage());
+                String msg = e.getMessage() != null ? e.getMessage() : "";
+                if (msg.contains("Unable to resolve host") || msg.contains("UnknownHost")
+                        || msg.contains("no address associated")) {
+                    callback.onError("No internet connection. Check your Wi-Fi or mobile data and pull to refresh.");
+                } else {
+                    callback.onError("Error: " + e.getClass().getSimpleName() + " — " + msg);
+                }
             }
         }).start();
     }
@@ -196,6 +203,7 @@ public class GmailFetcher {
                                             VendorStore vendorStore,
                                             VendorAliasStore aliasStore,
                                             TransactionOverrideStore overrides,
+                                            AiResultCache aiCache,
                                             String messageId) throws Exception {
         JSONObject obj     = new JSONObject(msgJson);
         JSONObject payload = obj.getJSONObject("payload");
@@ -236,26 +244,40 @@ public class GmailFetcher {
         // ── Interac fast-path ──
         if (subject.contains("Interac e-Transfer") || subject.contains("Interac e-transfer")) {
             return buildInteracTransaction(subject, from, snippet, fullBody,
-                    internalDate, vendor, rawVendor, messageId);
+                    internalDate, vendor, rawVendor, messageId, vendorStore);
         }
+
+        // ── Check per-message AI cache (skip Gemini for already-processed messages) ──
+        AiResultCache.CachedResult cachedAi = (aiCache != null && messageId != null)
+                ? aiCache.get(messageId) : null;
 
         // ── Check VendorStore cache — skip "Other" so AI gets another chance ──
         String cachedCategory = null;
-        if (vendor != null) {
+        if (cachedAi != null && cachedAi.category != null && !cachedAi.category.equals("Other")) {
+            cachedCategory = cachedAi.category;
+        }
+        if (cachedCategory == null && vendor != null) {
             String cached = vendorStore.getCategory(vendor);
             if (cached != null && !cached.equals("Other")) {
                 cachedCategory = cached;
             }
         }
 
-        // ── Run AI classification ──
+        // ── Run AI classification (only if not cached per-message) ──
         ClassificationResult res        = null;
         String               category   = cachedCategory;
         Double               modelAmount = null;
         String               modelDate   = null;
         String               aiMerchant  = null;
 
-        if (cachedCategory == null) {
+        if (cachedAi != null) {
+            // Use cached AI result — no Gemini call needed
+            category   = cachedAi.category;
+            modelAmount = cachedAi.amount;
+            modelDate   = cachedAi.date;
+            aiMerchant  = cachedAi.merchant;
+            Log.d(TAG, "Using cached AI result for message " + messageId);
+        } else if (cachedCategory == null) {
             boolean likelyTxn = TransactionClassifier.isTransactional(subject, snippet, fullBody);
 
             if (likelyTxn) {
@@ -272,11 +294,10 @@ public class GmailFetcher {
                         aiMerchant = res.vendor;
                     }
 
-                    // Learn: save vendor → category so we skip AI next time
-                    String keyToLearn = (aiMerchant != null) ? aiMerchant : vendor;
-                    if (keyToLearn != null) {
-                        vendorStore.setCategory(keyToLearn, category);
-                        Log.d(TAG, "Learned: " + keyToLearn + " → " + category);
+                    // Persist AI result per-message so we never call Gemini for this message again
+                    if (aiCache != null && messageId != null) {
+                        aiCache.put(messageId, aiMerchant, category, modelAmount, modelDate,
+                                res.type != null ? res.type : "outgoing");
                     }
 
                 } else if (res != null && res.category.equals("Other")) {
@@ -284,6 +305,12 @@ public class GmailFetcher {
                     modelAmount = res.amount;
                     if (res.vendor != null && !res.vendor.isEmpty()) aiMerchant = res.vendor;
                     category = guessCategoryFallback(vendor, subject);
+
+                    // Cache even "Other" result so we don't re-query Gemini for the same email
+                    if (aiCache != null && messageId != null) {
+                        aiCache.put(messageId, aiMerchant, category, modelAmount, modelDate,
+                                res.type != null ? res.type : "outgoing");
+                    }
                 } else {
                     // AI failed — fall back to keyword rules
                     category = guessCategoryFallback(vendor, subject);
@@ -291,6 +318,21 @@ public class GmailFetcher {
             } else {
                 // Not transactional by heuristic — keyword fallback only
                 category = guessCategoryFallback(vendor, subject);
+            }
+        }
+
+        // Persist alias so future emails from the same sender get the correct merchant name
+        if (aiMerchant != null && !aiMerchant.isEmpty()
+                && rawVendor != null && !rawVendor.equals(aiMerchant)
+                && aliasStore != null) {
+            aliasStore.setAlias(rawVendor, aiMerchant);
+        }
+
+        // Learn: persist vendor → category so we skip AI next time
+        if (category != null && !"Other".equals(category) && vendor != null) {
+            String keyToLearn = (aiMerchant != null) ? aiMerchant : vendor;
+            if (keyToLearn != null && cachedCategory == null) {
+                vendorStore.setCategory(keyToLearn, category);
             }
         }
 
@@ -355,7 +397,8 @@ public class GmailFetcher {
     private static Transaction buildInteracTransaction(String subject, String from,
                                                        String snippet, String fullBody,
                                                        long internalDate, String vendor,
-                                                       String rawVendor, String messageId) {
+                                                       String rawVendor, String messageId,
+                                                       VendorStore vendorStore) {
         String cat;
         Transaction.Type txnType;
         String lcSubject = subject.toLowerCase(Locale.US);
@@ -366,6 +409,11 @@ public class GmailFetcher {
         } else {
             cat     = "Interac Received";
             txnType = Transaction.Type.INCOMING;
+        }
+
+        // Learn: persist Interac vendor → category
+        if (vendor != null && vendorStore != null) {
+            vendorStore.setCategory(vendor, cat);
         }
 
         String searchText = subject + "\n" + (fullBody.isEmpty() ? snippet : fullBody);
@@ -580,6 +628,12 @@ public class GmailFetcher {
         int at = email.indexOf('@');
         if (at > 0) {
             String domain = email.substring(at + 1);
+            // Use the registrable domain name (e.g. "gmail" from "gmail.com")
+            String[] parts = domain.split("\\.");
+            if (parts.length >= 2) {
+                String name = parts[parts.length - 2];
+                return Character.toUpperCase(name.charAt(0)) + name.substring(1);
+            }
             int dot = domain.lastIndexOf('.');
             if (dot > 0) domain = domain.substring(0, dot);
             return Character.toUpperCase(domain.charAt(0)) + domain.substring(1);

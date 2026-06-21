@@ -90,6 +90,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/connect_trust_1_title"
+                        android:fontFamily="@font/googlesansflex_24pt_semibold"
                         android:textColor="@color/text_primary"
                         android:textSize="15sp"
                         android:fontWeight="600" />
@@ -139,6 +140,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/connect_trust_2_title"
+                        android:fontFamily="@font/googlesansflex_24pt_semibold"
                         android:textColor="@color/text_primary"
                         android:textSize="15sp"
                         android:fontWeight="600" />
@@ -188,6 +190,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/connect_trust_3_title"
+                        android:fontFamily="@font/googlesansflex_24pt_semibold"
                         android:textColor="@color/text_primary"
                         android:textSize="15sp"
                         android:fontWeight="600" />
@@ -208,6 +211,7 @@
                 android:layout_width="0dp"
                 android:layout_height="56dp"
                 android:text="@string/connect_cta"
+                android:fontFamily="@font/googlesansflex_24pt_bold"
                 android:textColor="@color/white"
                 android:textSize="17sp"
                 android:backgroundTint="@color/green_primary"
