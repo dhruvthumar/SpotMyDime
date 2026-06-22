@@ -128,5 +128,99 @@ public class GeminiClassifierResponseTest {
         assertEquals("Should preserve zero amount", 0.0, result6.amount, 0.01);
         assertEquals("Should preserve empty string type", "", result6.type);
     }
+
+    // ── STEP 1: is_transaction flag ──
+
+    @Test
+    public void testStep1FutureChargeNotTransaction() {
+        ClassificationResult r = new ClassificationResult("Shopping", "Amazon", 50.00, "outgoing",
+                null, false);
+        assertFalse("Future charges should not be transactions", r.isTransaction);
+        assertEquals("Shopping", r.category);
+    }
+
+    @Test
+    public void testStep1CompletedRefundIsTransaction() {
+        ClassificationResult r = new ClassificationResult("Shopping", "Amazon", 45.00, "outgoing",
+                null, true);
+        assertTrue("Completed refund should be a transaction", r.isTransaction);
+    }
+
+    // ── STEP 2: is_suspicious flag ──
+
+    @Test
+    public void testStep2GenericSenderIsSuspicious() {
+        ClassificationResult r = new ClassificationResult("Transfers", "Unknown", 100.00, "incoming",
+                null, false, true);
+        assertTrue("Generic sender with no business should be suspicious", r.isSuspicious);
+        assertFalse("Suspicious overrides transaction", r.isTransaction);
+    }
+
+    @Test
+    public void testStep2RealCharityNotSuspicious() {
+        ClassificationResult r = new ClassificationResult("Donations", "Red Cross", 50.00, "outgoing",
+                null, true, false);
+        assertFalse("Real named charity should not be suspicious", r.isSuspicious);
+        assertTrue("Real charity pledge should be transaction", r.isTransaction);
+    }
+
+    // ── STEP 3: urgency language ──
+
+    @Test
+    public void testStep3UrgencyLanguageIsSuspicious() {
+        ClassificationResult r = new ClassificationResult("Other", "Unknown", null, null,
+                null, false, true);
+        assertTrue("Urgency language should be suspicious", r.isSuspicious);
+        assertEquals("Other", r.category);
+    }
+
+    // ── STEP 4: merchant_confidence (tests default values) ──
+
+    @Test
+    public void testStep4FamiliarBrandHighConfidence() {
+        ClassificationResult r = new ClassificationResult("Subscriptions", "Netflix", 15.99, "outgoing",
+                null, true, false);
+        assertTrue(r.isTransaction);
+        assertFalse(r.isSuspicious);
+    }
+
+    @Test
+    public void testStep4GenericBankTransferNoMerchant() {
+        ClassificationResult r = new ClassificationResult("Transfers", "", 500.00, "incoming",
+                null, true, false);
+        assertTrue(r.isTransaction);
+        assertFalse(r.isSuspicious);
+        assertEquals("", r.vendor);
+    }
+
+    // ── isSuspicious overrides isTransaction ──
+
+    @Test
+    public void testSuspiciousDefaultsCategoryToOther() {
+        ClassificationResult r = new ClassificationResult(null, null, null, null,
+                null, false, true);
+        assertEquals("Suspicious null category defaults to 'Other'", "Other", r.category);
+        assertFalse(r.isTransaction);
+        assertTrue(r.isSuspicious);
+    }
+
+    @Test
+    public void testSuspiciousFalseByDefault() {
+        ClassificationResult r = new ClassificationResult("Shopping", "Amazon", 59.99, "outgoing");
+        assertFalse("Should default to not suspicious", r.isSuspicious);
+        assertTrue("Should default to transaction true", r.isTransaction);
+    }
+
+    @Test
+    public void testSuspiciousAllNulls() {
+        ClassificationResult r = new ClassificationResult(null, null, null, null,
+                null, false, true);
+        assertEquals("Other", r.category);
+        assertEquals("", r.vendor);
+        assertNull(r.amount);
+        assertNull(r.type);
+        assertFalse(r.isTransaction);
+        assertTrue(r.isSuspicious);
+    }
 }
 

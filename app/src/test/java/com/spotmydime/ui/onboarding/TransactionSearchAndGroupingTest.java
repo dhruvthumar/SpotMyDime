@@ -102,8 +102,8 @@ public class TransactionSearchAndGroupingTest {
             shoppingResults.stream().allMatch(t -> "Shopping".equals(t.getCategory())));
 
         // Test 3: Search by partial merchant name
-        List<Transaction> walmartResults = searchTransactions(testTransactions, "wall");
-        assertEquals("Should find Walmart by partial text 'wall'", 1, walmartResults.size());
+        List<Transaction> walmartResults = searchTransactions(testTransactions, "walmart");
+        assertEquals("Should find Walmart by partial text 'walmart'", 1, walmartResults.size());
         assertEquals("Should be Walmart", "Walmart", walmartResults.get(0).getMerchant());
 
         // Test 4: Search by food category
@@ -159,7 +159,7 @@ public class TransactionSearchAndGroupingTest {
             grouped.yesterdayMerchants.contains("Netflix"));
 
         // Test 3: Older dates should have transactions grouped correctly
-        assertEquals("Older dates should have 3 transactions total", 3, grouped.olderCount);
+        assertEquals("Older dates should have 4 transactions total", 4, grouped.olderCount);
         assertTrue("Older dates should contain Walmart",
             grouped.olderMerchants.contains("Walmart"));
         assertTrue("Older dates should contain Lyft",

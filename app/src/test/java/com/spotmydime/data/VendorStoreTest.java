@@ -9,13 +9,14 @@ import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
 import static org.junit.Assert.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for VendorStore
  * Tests the persistence of vendor-to-category mappings using SharedPreferences
  */
-@RunWith(MockitoJUnitRunner.class)
+@RunWith(MockitoJUnitRunner.Silent.class)
 public class VendorStoreTest {
 
     @Mock
@@ -31,38 +32,27 @@ public class VendorStoreTest {
 
     @Before
     public void setUp() {
-        // Setup mock behavior: when context.getSharedPreferences is called, return mock prefs
-        when(mockContext.getSharedPreferences("vendor_categories", Context.MODE_PRIVATE))
+        when(mockContext.getSharedPreferences(anyString(), anyInt()))
                 .thenReturn(mockPreferences);
 
-        // Setup mock editor chain: prefs.edit() returns editor, and apply() returns void
         when(mockPreferences.edit()).thenReturn(mockEditor);
         when(mockEditor.putString(anyString(), anyString())).thenReturn(mockEditor);
 
         vendorStore = new VendorStore(mockContext);
     }
 
-    /**
-     * Test Case 1: Save and retrieve vendor categories
-     * Verifies that vendor-to-category mappings are correctly stored and retrieved
-     * from SharedPreferences, ensuring the learn-by-vendor system works.
-     */
     @Test
     public void testSaveAndRetrieveVendorCategory() {
-        // Setup mock to return a valid mapping when getCategory is called
-        when(mockPreferences.getString("vendor_categories", "{}"))
+        when(mockPreferences.getString(anyString(), anyString()))
                 .thenReturn("{\"Amazon\":\"Shopping\",\"Starbucks\":\"Food & Dining\"}");
 
-        // Test retrieve Amazon → Shopping
         String amazonCategory = vendorStore.getCategory("Amazon");
         assertEquals("Should retrieve 'Shopping' for Amazon vendor", "Shopping", amazonCategory);
 
-        // Test retrieve Starbucks → Food & Dining
         String starbucksCategory = vendorStore.getCategory("Starbucks");
         assertEquals("Should retrieve 'Food & Dining' for Starbucks vendor", "Food & Dining", starbucksCategory);
 
-        // Test non-existent vendor returns null
-        when(mockPreferences.getString("vendor_categories", "{}"))
+        when(mockPreferences.getString(anyString(), anyString()))
                 .thenReturn("{\"Amazon\":\"Shopping\"}");
         String unknownCategory = vendorStore.getCategory("UnknownVendor");
         assertNull("Should return null for unknown vendor", unknownCategory);

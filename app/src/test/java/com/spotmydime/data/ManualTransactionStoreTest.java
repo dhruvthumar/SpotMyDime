@@ -180,5 +180,75 @@ public class ManualTransactionStoreTest {
             txn5.getMessageId().startsWith("manual_") &&
             txn6.getMessageId().startsWith("manual_"));
     }
+
+    /**
+     * Test Case 3: Delete a manual transaction
+     * Verifies that delete() removes the correct transaction and
+     * does not affect others in the list.
+     */
+    @Test
+    public void testDeleteRemovesCorrectTransaction() {
+        when(mockPreferences.getString("list", "[]"))
+                .thenReturn("[{\"merchant\":\"Amazon\",\"amount\":59.99,\"dateMillis\":1718900000000," +
+                           "\"dateDisplay\":\"Jun 15\",\"category\":\"Shopping\",\"type\":\"outgoing\"," +
+                           "\"notes\":\"Order\",\"id\":\"manual_abc123\"}," +
+                           "{\"merchant\":\"Netflix\",\"amount\":15.99,\"dateMillis\":1718900000000," +
+                           "\"dateDisplay\":\"Jun 15\",\"category\":\"Subscriptions\",\"type\":\"outgoing\"," +
+                           "\"notes\":\"\",\"id\":\"manual_def456\"}]")
+                .thenReturn("[{\"merchant\":\"Amazon\",\"amount\":59.99,\"dateMillis\":1718900000000," +
+                           "\"dateDisplay\":\"Jun 15\",\"category\":\"Shopping\",\"type\":\"outgoing\"," +
+                           "\"notes\":\"Order\",\"id\":\"manual_abc123\"}]");
+
+        List<Transaction> all = manualStore.getAll();
+        assertEquals(2, all.size());
+
+        manualStore.delete("manual_def456");
+
+        all = manualStore.getAll();
+        assertEquals(1, all.size());
+        assertEquals("Amazon", all.get(0).getMerchant());
+        assertEquals("manual_abc123", all.get(0).getMessageId());
+    }
+
+    /**
+     * Test Case 4: Save and retrieve transaction list (JSON round-trip)
+     * Verifies that saving a transaction and then retrieving it preserves
+     * all fields correctly through the JSON serialization/deserialization.
+     */
+    @Test
+    public void testSaveAndGetAllRoundTrip() {
+        when(mockPreferences.getString("list", "[]"))
+                .thenReturn("[]")
+                .thenReturn("[{\"merchant\":\"Starbucks\",\"amount\":5.50,\"dateMillis\":1718900000000," +
+                           "\"dateDisplay\":\"Jun 20\",\"category\":\"Food & Drink\",\"type\":\"outgoing\"," +
+                           "\"notes\":\"Coffee\",\"id\":\"manual_test123\"}]");
+
+        Transaction txn = ManualTransactionStore.createTransaction(
+            "Starbucks", 5.50, 1718900000000L, "Jun 20",
+            "Food & Drink", Transaction.Type.OUTGOING, "Coffee");
+
+        List<Transaction> before = manualStore.getAll();
+        assertEquals(0, before.size());
+
+        manualStore.save(txn);
+
+        List<Transaction> after = manualStore.getAll();
+        assertEquals(1, after.size());
+        Transaction loaded = after.get(0);
+        assertEquals("Starbucks", loaded.getMerchant());
+        assertEquals(5.50, loaded.getAmount(), 0.01);
+        assertEquals("Food & Drink", loaded.getCategory());
+        assertEquals(Transaction.Type.OUTGOING, loaded.getType());
+        assertEquals("Coffee", loaded.getSubject());
+    }
+
+    /**
+     * Test Case 5: Delete null ID does nothing
+     */
+    @Test
+    public void testDeleteNullId() {
+        manualStore.delete(null);
+        verify(mockPreferences, never()).edit();
+    }
 }
 
