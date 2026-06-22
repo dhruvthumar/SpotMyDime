@@ -194,6 +194,20 @@
                                 android:textSize="13sp"
                                 android:layout_marginTop="2dp" />
                     </LinearLayout>
+
+                    <TextView
+                            android:id="@+id/btn_settings_sign_out"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Sign Out"
+                            android:textColor="#E53935"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:paddingHorizontal="14dp"
+                            android:paddingVertical="6dp"
+                            android:background="@drawable/btn_save_outline"
+                            android:gravity="center"
+                            android:layout_gravity="center_vertical" />
                 </LinearLayout>
 
                 <!-- ═══ PREFERENCES SECTION ═══ -->

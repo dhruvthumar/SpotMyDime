@@ -36,6 +36,10 @@ import androidx.cardview.widget.CardView;
 import androidx.core.content.ContextCompat;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
+import com.google.android.gms.auth.api.signin.GoogleSignIn;
+import com.google.android.gms.auth.api.signin.GoogleSignInClient;
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+
 import com.spotmydime.BuildConfig;
 import com.spotmydime.R;
 import com.spotmydime.ai.GeminiClassifier;
@@ -1538,6 +1542,10 @@ public class HomeActivity extends AppCompatActivity {
                     }
                     List<Transaction> filtered = new ArrayList<>();
                     for (Transaction tx : deduped) {
+                        if (tx.getMessageId() != null && !tx.getMessageId().startsWith("manual_")
+                                && excludedStore.isExcluded(tx.getMessageId())) {
+                            continue;
+                        }
                         if (!isInPausedRange(tx.getDateMillis())) {
                             filtered.add(tx);
                         }
@@ -2584,6 +2592,17 @@ public class HomeActivity extends AppCompatActivity {
         showSettingsScreen(containerSettingsMain);
     }
 
+    private void clearAppData() {
+        getSharedPreferences("settings_prefs", Context.MODE_PRIVATE).edit().clear().apply();
+        getSharedPreferences("excluded_messages", Context.MODE_PRIVATE).edit().clear().apply();
+        getSharedPreferences("vendor_categories", Context.MODE_PRIVATE).edit().clear().apply();
+        getSharedPreferences("vendor_aliases", Context.MODE_PRIVATE).edit().clear().apply();
+        getSharedPreferences("tx_overrides", Context.MODE_PRIVATE).edit().clear().apply();
+        getSharedPreferences("ai_result_cache", Context.MODE_PRIVATE).edit().clear().apply();
+        getSharedPreferences("manual_transactions", Context.MODE_PRIVATE).edit().clear().apply();
+        getSharedPreferences("sync_state", Context.MODE_PRIVATE).edit().clear().apply();
+    }
+
     private void setupSettingsProfile() {
         String userName = getIntent().getStringExtra("user_name");
         String userEmail = getIntent().getStringExtra("user_email");
@@ -2591,6 +2610,28 @@ public class HomeActivity extends AppCompatActivity {
         if (userEmail == null || userEmail.isEmpty()) userEmail = "user@email.com";
         ((TextView) findViewById(R.id.tv_settings_name)).setText(userName);
         ((TextView) findViewById(R.id.tv_settings_email)).setText(userEmail);
+
+        findViewById(R.id.btn_settings_sign_out).setOnClickListener(v -> {
+            new AlertDialog.Builder(this)
+                    .setTitle("Sign Out")
+                    .setMessage("Are you sure you want to sign out? All data on this device will be cleared.")
+                    .setPositiveButton("Sign Out", (dialog, which) -> {
+                        stopPeriodicScan();
+                        clearAppData();
+                        GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                                .requestEmail()
+                                .build();
+                        GoogleSignInClient client = GoogleSignIn.getClient(this, gso);
+                        client.signOut().addOnCompleteListener(task -> {
+                            Intent intent = new Intent(this, OnboardingActivity.class);
+                            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                            startActivity(intent);
+                            finish();
+                        });
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+        });
 
         ImageView ivAvatar = findViewById(R.id.iv_settings_avatar);
         int size = dp(56);
