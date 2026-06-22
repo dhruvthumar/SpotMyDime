@@ -105,8 +105,10 @@ public class GeminiClassifier {
              + "OUTPUT FORMAT — respond with ONLY this JSON, no markdown, no commentary:\n"
              + "{\n"
              + "  \"is_transaction\": true or false,\n"
+             + "  \"is_suspicious\": true or false,\n"
+             + "  \"merchant_confidence\": \"<'high', 'low', or 'none'>\",\n"
              + "  \"category\": \"<one of the categories below>\",\n"
-             + "  \"merchant\": \"<short friendly merchant name, e.g. 'Netflix', 'Tim Hortons', 'Amazon'>\",\n"
+             + "  \"merchant\": \"<short friendly merchant name, e.g. 'Netflix', 'Tim Hortons', 'Amazon', or empty string if you cannot identify one>\",\n"
              + "  \"amount\": \"<numeric only, e.g. 12.99, or empty string if unknown>\",\n"
              + "  \"type\": \"<'incoming' or 'outgoing'>\",\n"
              + "  \"date\": \"<date found in email as YYYY-MM-DD, or empty string if none>\"\n"
@@ -115,19 +117,59 @@ public class GeminiClassifier {
              + "  Food & Dining, Shopping, Subscriptions, Transportation,\n"
              + "  Bills & Utilities, Entertainment, Health, Travel,\n"
              + "  Transfers, Interac Sent, Interac Received, Other\n\n"
-             + "RULES:\n"
-             + "1. is_transaction = true only if the email confirms a specific payment, purchase,\n"
-             + "   charge, refund, receipt, or money transfer with a dollar amount.\n"
-             + "   Promotional emails, account summaries, and newsletters = false.\n"
-             + "2. type = 'outgoing' when money LEAVES the user (purchases, bills, payments, fees).\n"
-             + "   type = 'incoming' when money COMES TO the user (refunds, deposits, cashback,\n"
-             + "   Interac received, salary, reimbursements).\n"
-             + "3. Credit card payment confirmation → outgoing (user paying their card bill).\n"
-             + "4. merchant = the business name the user would recognise, NOT the email sender name.\n"
-             + "   E.g. sender 'Uber Receipts <uber.com>' → merchant 'Uber'.\n"
-             + "5. If is_transaction = false, still return all fields but set category = 'Other',\n"
-             + "   amount = '', type = 'outgoing'.\n"
-             + "6. amount must be the transaction total only (no currency symbols, no commas).\n";
+              + "RULES FOR is_transaction:\n"
+              + "1. is_transaction = true only if the email confirms a specific payment, purchase,\n"
+              + "   charge, refund, receipt, or money transfer that HAS ALREADY HAPPENED, with a dollar amount.\n"
+              + "2. is_transaction = false if the sender is from a personal email domain (gmail.com,\n"
+              + "   yahoo.com, outlook.com, hotmail.com, icloud.com, etc.) AND the sender display name\n"
+              + "   is a generic single word like 'returns', 'support', 'noreply', 'info', 'hello',\n"
+              + "   'team', 'billing', 'alerts' AND no real business/merchant name appears anywhere in\n"
+              + "   the email body or subject — there must be an actual identifiable company for this\n"
+              + "   to be a valid transaction.\n"
+              + "3. is_transaction = false for: promotional emails, newsletters, account summaries,\n"
+              + "   future/scheduled charges that have not happened yet (e.g. 'will be charged on the 1st',\n"
+              + "   'renews on July 15', 'no payment has been processed yet'), pledges/reminders about\n"
+              + "   money that has not moved, requests for money (someone asking the user to pay, not\n"
+              + "   a confirmation that the user already paid), and balance/quote/estimate notices where\n"
+              + "   no charge occurred.\n\n"
+              + "RULES FOR is_suspicious — set true if the email shows signs of being spam, phishing,\n"
+              + "or a scam, REGARDLESS of whether is_transaction is true or false. Specifically:\n"
+              + "4. is_suspicious = true if the sender is a generic/unidentifiable address (e.g. a personal-\n"
+              + "   looking Gmail/Yahoo/Hotmail address, or a generic label like 'returns', 'support',\n"
+              + "   'noreply', 'billing', 'team', 'alerts') AND the email body/subject does NOT clearly\n"
+              + "   name a real, identifiable business anywhere — i.e. there is genuinely no company,\n"
+              + "   brand, or merchant the user could recognize.\n"
+              + "5. is_suspicious = true if the email uses urgency, fear, or pressure language to get the\n"
+              + "   user to click a link or 'verify' something (e.g. 'act now', 'your account will be\n"
+              + "   locked', 'claim your prize', 'unusual activity — click here'), especially combined\n"
+              + "   with vague or generic sender/business identity.\n"
+              + "6. is_suspicious = true if amounts, order numbers, or claims seem internally inconsistent\n"
+              + "   or designed to bait a response (e.g. a large unexplained refund/prize with no purchase\n"
+              + "   history context, or a request framed as a system test).\n"
+              + "7. is_suspicious = false for ordinary legitimate transactions even if the merchant name is\n"
+              + "   hard to pin down — e.g. a real but small/unfamiliar local business, a person's name on\n"
+              + "   a peer-to-peer transfer, or a utility/biller you don't recognize. Not knowing a brand is\n"
+              + "   NOT the same as the email being suspicious — only flag it when the signals above are\n"
+              + "   actually present. Most legitimate receipts from small or unfamiliar vendors should NOT\n"
+              + "   be marked suspicious just because you don't recognize the name.\n\n"
+              + "RULES FOR merchant_confidence:\n"
+              + "8. 'high' = you can clearly name the specific business (e.g. 'Netflix', 'Tim Hortons').\n"
+              + "9. 'low' = there's a real business but you're inferring/guessing the name from limited info.\n"
+              + "10. 'none' = you cannot identify any business or person this transaction is with.\n"
+              + "    merchant_confidence = 'none' does NOT by itself mean is_suspicious = true — a real\n"
+              + "    transaction can still have no identifiable merchant (e.g. a generic bank transfer\n"
+              + "    notice). Only use the is_suspicious criteria above to decide that field.\n\n"
+              + "OTHER RULES:\n"
+              + "11. type = 'outgoing' when money LEAVES the user (purchases, bills, payments, fees).\n"
+              + "    type = 'incoming' when money COMES TO the user (refunds, deposits, cashback,\n"
+              + "    Interac received, salary, reimbursements).\n"
+              + "12. Credit card payment confirmation → outgoing (user paying their card bill).\n"
+              + "13. merchant = the business name the user would recognise, NOT the email sender name.\n"
+              + "    E.g. sender 'Uber Receipts <uber.com>' → merchant 'Uber'. Use empty string if\n"
+              + "    merchant_confidence is 'none'.\n"
+              + "14. If is_transaction = false, still return all fields but set category = 'Other',\n"
+              + "    amount = '', type = 'outgoing'.\n"
+              + "15. amount must be the transaction total only (no currency symbols, no commas).\n";
     }
 
     private static String safe(String s) {
@@ -265,18 +307,28 @@ public class GeminiClassifier {
 
             JSONObject out = new JSONObject(text.substring(start, end + 1));
 
-            boolean isTxn    = out.optBoolean("is_transaction", true);
-            String category  = out.optString("category", "Other");
-            String merchant  = out.optString("merchant", "");
-            String amountStr = out.optString("amount", "");
-            String type      = out.optString("type", "outgoing");
-            String date      = out.optString("date", "");
+            boolean isTxn        = out.optBoolean("is_transaction", true);
+            boolean isSuspicious = out.optBoolean("is_suspicious", false);
+            String category      = out.optString("category", "Other");
+            String merchant      = out.optString("merchant", "");
+            String amountStr     = out.optString("amount", "");
+            String type          = out.optString("type", "outgoing");
+            String date          = out.optString("date", "");
+            // merchant_confidence is read for logging/future use but doesn't
+            // gate anything here directly — the is_suspicious criteria in the
+            // prompt already account for "no identifiable merchant" cases that
+            // genuinely warrant suspicion vs. those that don't.
+            String merchantConfidence = out.optString("merchant_confidence", "low");
+            Log.d(TAG, "merchant_confidence=" + merchantConfidence + " is_suspicious=" + isSuspicious);
 
             // If model says not a transaction, return a result that clearly
             // signals that — caller (GmailFetcher) checks isTransaction and
             // discards the email instead of creating a Transaction for it.
+            // isSuspicious is still propagated even here, since GmailFetcher
+            // logs/handles suspicious-and-not-a-transaction the same as
+            // suspicious-and-is-a-transaction: discard either way.
             if (!isTxn) {
-                return new ClassificationResult("Other", merchant, null, "outgoing", null, false);
+                return new ClassificationResult("Other", merchant, null, "outgoing", null, false, isSuspicious);
             }
 
             // Parse amount
@@ -289,7 +341,7 @@ public class GeminiClassifier {
 
             String dateResult = (date != null && date.matches("\\d{4}-\\d{2}-\\d{2}")) ? date : null;
 
-            return new ClassificationResult(category, merchant, amount, type, dateResult, true);
+            return new ClassificationResult(category, merchant, amount, type, dateResult, true, isSuspicious);
 
         } catch (Exception e) {
             Log.e(TAG, "Failed to parse Gemini response", e);

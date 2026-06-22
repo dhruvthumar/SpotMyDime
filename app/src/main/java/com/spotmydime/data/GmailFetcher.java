@@ -24,6 +24,7 @@ import java.net.URL;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
@@ -47,6 +48,16 @@ public class GmailFetcher {
                             +    "sale|balance|fee|subtotal|grand\\s+total|sum)"
                             + "\\s*[:\\s]*\\$?\\s*[0-9]+(?:[,.][0-9]+)*",
                     Pattern.CASE_INSENSITIVE);
+
+    // Known personal/free email domains. Emails from these addresses with no
+    // identifiable vendor should be discarded — they are likely spam, phishing,
+    // or generic notifications that do not represent real transactions.
+    private static final Set<String> PERSONAL_DOMAINS = Collections.unmodifiableSet(
+            new HashSet<>(Arrays.asList(
+                    "gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "live.com",
+                    "aol.com", "icloud.com", "mail.com", "protonmail.com", "zoho.com",
+                    "yandex.com", "gmx.com"
+            )));
 
     public static final int REQUEST_AUTH = 1001;
 
@@ -309,9 +320,14 @@ public class GmailFetcher {
 
         if (cachedAi != null) {
             // Cached verdict from a previous sync says this message is NOT a
-            // real transaction — discard again without calling Gemini.
+            // real transaction, or was flagged suspicious — discard again
+            // without calling Gemini.
             if ("__NOT_A_TRANSACTION__".equals(cachedAi.category)) {
                 Log.d(TAG, "DISCARD (cached: not a transaction): " + subject);
+                return null;
+            }
+            if ("__SUSPICIOUS__".equals(cachedAi.category)) {
+                Log.d(TAG, "DISCARD (cached: flagged suspicious): " + subject);
                 return null;
             }
             // Use cached AI result — no Gemini call needed
@@ -327,7 +343,20 @@ public class GmailFetcher {
                 // PRIMARY: call Gemini with subject + body
                 res = GeminiClassifier.classifyFull(vendor, subject, snippet, fullBody);
 
-                if (res != null && !res.isTransaction) {
+                if (res != null && res.isSuspicious) {
+                    // AI flagged this as spam/phishing-like — discard regardless
+                    // of what is_transaction says, since a scam dressed up as a
+                    // transaction is exactly the security risk we're guarding
+                    // against. Caching this separately from
+                    // __NOT_A_TRANSACTION__ so future debugging/logging can
+                    // tell the two discard reasons apart if needed.
+                    if (aiCache != null && messageId != null) {
+                        aiCache.put(messageId, null, "__SUSPICIOUS__", null, null, "outgoing");
+                    }
+                    Log.d(TAG, "DISCARD (AI flagged suspicious): " + subject);
+                    return null;
+
+                } else if (res != null && !res.isTransaction) {
                     // AI explicitly says this is NOT a real transaction (promo,
                     // newsletter, balance check, "you owe" reminder, etc.) —
                     // discard it instead of guessing a category and keeping it.
@@ -379,6 +408,27 @@ public class GmailFetcher {
             } else {
                 // Not transactional by heuristic — keyword fallback only
                 category = guessCategoryFallback(vendor, subject);
+            }
+        }
+
+        // ── Personal-sender security guard ─────────────────────────────
+        // If the AI and heuristic both failed to assign a meaningful
+        // category AND the sender is from a personal email domain
+        // (gmail.com, yahoo.com, etc.), this email has no identifiable
+        // business/vendor — discard it to avoid surfacing spam or
+        // generic notifications as transactions.
+        if ((category == null || "Other".equals(category))) {
+            String emailAddr = extractEmailFromHeader(from);
+            if (emailAddr != null && isPersonalEmailDomain(emailAddr)) {
+                boolean hasUserOverride = (messageId != null && overrides != null
+                        && overrides.getType(messageId) != null);
+                if (!hasUserOverride) {
+                    Log.d(TAG, "DISCARD (personal domain, no vendor found): " + subject);
+                    if (aiCache != null && messageId != null) {
+                        aiCache.put(messageId, null, "__NOT_A_TRANSACTION__", null, null, "outgoing");
+                    }
+                    return null;
+                }
             }
         }
 
@@ -721,5 +771,13 @@ public class GmailFetcher {
         if (s >= 0 && e > s) return from.substring(s + 1, e).trim();
         String t = from.trim();
         return t.contains("@") ? t : null;
+    }
+
+    private static boolean isPersonalEmailDomain(String email) {
+        if (email == null) return false;
+        int at = email.indexOf('@');
+        if (at < 0) return false;
+        String domain = email.substring(at + 1).toLowerCase(Locale.US);
+        return PERSONAL_DOMAINS.contains(domain);
     }
 }

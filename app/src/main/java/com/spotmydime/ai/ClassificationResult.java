@@ -14,25 +14,39 @@ public class ClassificationResult {
     // fallback ClassificationResult construction) keep their prior behavior.
     public final boolean isTransaction;
 
+    // The AI's spam/phishing verdict — independent of isTransaction. A
+    // transaction can be real but still suspicious (e.g. a generic sender
+    // with urgency language), and a non-transaction is not automatically
+    // suspicious (e.g. an ordinary newsletter). Defaults to false on the
+    // older constructors so nothing already in the codebase is treated as
+    // suspicious unless explicitly marked so by the new Gemini prompt logic.
+    public final boolean isSuspicious;
+
     public ClassificationResult(String category, String vendor, Double amount) {
-        this(category, vendor, amount, null, null, true);
+        this(category, vendor, amount, null, null, true, false);
     }
 
     public ClassificationResult(String category, String vendor, Double amount, String type) {
-        this(category, vendor, amount, type, null, true);
+        this(category, vendor, amount, type, null, true, false);
     }
 
     public ClassificationResult(String category, String vendor, Double amount, String type, String dateStr) {
-        this(category, vendor, amount, type, dateStr, true);
+        this(category, vendor, amount, type, dateStr, true, false);
     }
 
     public ClassificationResult(String category, String vendor, Double amount, String type,
                                  String dateStr, boolean isTransaction) {
+        this(category, vendor, amount, type, dateStr, isTransaction, false);
+    }
+
+    public ClassificationResult(String category, String vendor, Double amount, String type,
+                                 String dateStr, boolean isTransaction, boolean isSuspicious) {
         this.category = category == null ? "Other" : category;
         this.vendor   = vendor == null ? "" : vendor;
         this.amount   = amount;
         this.type     = type;
         this.dateStr  = dateStr;
         this.isTransaction = isTransaction;
+        this.isSuspicious  = isSuspicious;
     }
 }
