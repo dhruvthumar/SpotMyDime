@@ -141,6 +141,7 @@ public class GmailFetcher {
 
                 VendorStore vendorStore           = new VendorStore(context);
                 VendorAliasStore aliasStore       = new VendorAliasStore(context);
+                SubjectRuleStore subjectRuleStore = new SubjectRuleStore(context);
                 TransactionOverrideStore overrides = new TransactionOverrideStore(context);
                 ExcludedMessageStore excluded     = new ExcludedMessageStore(context);
                 AiResultCache aiCache             = new AiResultCache(context);
@@ -165,7 +166,7 @@ public class GmailFetcher {
                         if (msgDate > newestSeenMillis) newestSeenMillis = msgDate;
                     } catch (Exception ignored) {}
 
-                    Transaction t = parseMessage(msgJson, vendorStore, aliasStore, overrides, aiCache, msgId);
+                    Transaction t = parseMessage(msgJson, vendorStore, aliasStore, subjectRuleStore, overrides, aiCache, msgId);
                     if (t != null) {
                         results.add(t);
                         Log.d(TAG, "OK  " + t.getMerchant()
@@ -250,6 +251,7 @@ public class GmailFetcher {
     private static Transaction parseMessage(String msgJson,
                                             VendorStore vendorStore,
                                             VendorAliasStore aliasStore,
+                                            SubjectRuleStore subjectRuleStore,
                                             TransactionOverrideStore overrides,
                                             AiResultCache aiCache,
                                             String messageId) throws Exception {
@@ -279,44 +281,70 @@ public class GmailFetcher {
         }
 
         // ── Extract vendor from From header ──
-        String rawVendor = extractVendorName(from);
-        String vendor    = rawVendor;
-        if (vendor != null && aliasStore != null) {
-            String alias = aliasStore.getAlias(vendor);
-            if (alias != null) vendor = alias;
+        String rawVendor  = extractVendorName(from);
+        String vendor     = rawVendor;
+        String senderEmail = extractEmailFromHeader(from);
+
+        // ── Check subject-based rules FIRST (user-defined per-subject overrides) ──
+        SubjectRuleStore.SubjectRule matchedRule = null;
+        if (senderEmail != null && subjectRuleStore != null) {
+            matchedRule = subjectRuleStore.findMatch(senderEmail, subject);
+            if (matchedRule != null) {
+                Log.d(TAG, "Subject rule matched for " + senderEmail
+                        + ": " + matchedRule.keywordsKey
+                        + " -> alias=" + matchedRule.alias
+                        + ", category=" + matchedRule.category);
+            }
+        }
+
+        if (matchedRule == null) {
+            // No subject rule — fall back to vendor-wide alias
+            if (vendor != null && aliasStore != null) {
+                String alias = aliasStore.getAlias(vendor);
+                if (alias != null) vendor = alias;
+            }
         }
 
         // ── Extract body ──
         String fullBody = extractBodyText(payload);
 
         // ── Interac fast-path ──
-        if (subject.contains("Interac e-Transfer") || subject.contains("Interac e-transfer")) {
+        String lcSubject = subject.toLowerCase(Locale.US);
+        if (lcSubject.contains("interac e-transfer") || lcSubject.contains("interac e transfer")) {
             return buildInteracTransaction(subject, from, snippet, fullBody,
                     internalDate, vendor, rawVendor, messageId, vendorStore);
         }
 
+        // ── If a subject rule matched, use its values directly (skip AI) ──
+        if (matchedRule != null) {
+            // Subject rule matched — use user-defined values for both merchant and category
+            // No Gemini call, no vendor-wide alias/category learning
+        }
+
         // ── Check per-message AI cache (skip Gemini for already-processed messages) ──
-        AiResultCache.CachedResult cachedAi = (aiCache != null && messageId != null)
+        AiResultCache.CachedResult cachedAi = (aiCache != null && messageId != null && matchedRule == null)
                 ? aiCache.get(messageId) : null;
 
         // ── Check VendorStore cache — skip "Other" so AI gets another chance ──
         String cachedCategory = null;
-        if (cachedAi != null && cachedAi.category != null && !cachedAi.category.equals("Other")) {
+        if (matchedRule != null && matchedRule.category != null) {
+            cachedCategory = matchedRule.category;
+        } else if (cachedAi != null && cachedAi.category != null && !cachedAi.category.equals("Other")) {
             cachedCategory = cachedAi.category;
         }
-        if (cachedCategory == null && vendor != null) {
+        if (cachedCategory == null && vendor != null && matchedRule == null) {
             String cached = vendorStore.getCategory(vendor);
             if (cached != null && !cached.equals("Other")) {
                 cachedCategory = cached;
             }
         }
 
-        // ── Run AI classification (only if not cached per-message) ──
+        // ── Run AI classification (only if not cached per-message and no subject rule) ──
         ClassificationResult res        = null;
         String               category   = cachedCategory;
         Double               modelAmount = null;
         String               modelDate   = null;
-        String               aiMerchant  = null;
+        String               aiMerchant  = (matchedRule != null) ? matchedRule.alias : null;
 
         if (cachedAi != null) {
             // Cached verdict from a previous sync says this message is NOT a
@@ -472,15 +500,16 @@ public class GmailFetcher {
             }
         }
 
-        // Persist alias so future emails from the same sender get the correct merchant name
-        if (aiMerchant != null && !aiMerchant.isEmpty()
+        // Persist alias — skip when a subject rule matched to avoid overwriting
+        // vendor-wide alias with a subject-specific value
+        if (matchedRule == null && aiMerchant != null && !aiMerchant.isEmpty()
                 && rawVendor != null && !rawVendor.equals(aiMerchant)
                 && aliasStore != null) {
             aliasStore.setAlias(rawVendor, aiMerchant);
         }
 
-        // Learn: persist vendor → category so we skip AI next time
-        if (category != null && !"Other".equals(category) && vendor != null) {
+        // Learn: persist vendor → category — skip when a subject rule matched
+        if (matchedRule == null && category != null && !"Other".equals(category) && vendor != null) {
             String keyToLearn = (aiMerchant != null) ? aiMerchant : vendor;
             if (keyToLearn != null && cachedCategory == null) {
                 vendorStore.setCategory(keyToLearn, category);

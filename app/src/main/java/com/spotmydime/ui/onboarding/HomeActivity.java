@@ -50,6 +50,7 @@ import com.spotmydime.data.TransactionParser;
 import com.spotmydime.data.VendorStore;
 import com.spotmydime.data.ExcludedMessageStore;
 import com.spotmydime.data.VendorAliasStore;
+import com.spotmydime.data.SubjectRuleStore;
 import com.spotmydime.data.TransactionOverrideStore;
 
 import org.json.JSONArray;
@@ -2119,14 +2120,20 @@ public class HomeActivity extends AppCompatActivity {
             if (!newMerchant.isEmpty()) {
                 String key = t.getRawVendor() != null ? t.getRawVendor() : t.getMerchant();
                 String msgId = t.getMessageId();
+                String senderEmail = t.getSenderEmail();
+                String txSubject = t.getSubject();
 
-                // Save category alias (vendor-wide)
-                VendorStore vs = new VendorStore(HomeActivity.this);
-                vs.setCategory(key, newCategory);
-
-                // Save merchant alias (vendor-wide)
-                if (!newMerchant.equals(t.getMerchant())) {
-                    aliasStore.setAlias(key, newMerchant);
+                // Save subject rule (sender + subject keywords → merchant + category)
+                SubjectRuleStore subjectRuleStore = new SubjectRuleStore(HomeActivity.this);
+                if (senderEmail != null && txSubject != null) {
+                    subjectRuleStore.setRule(senderEmail, txSubject, newMerchant, newCategory);
+                } else {
+                    // No sender/subject (manual transactions) — fall back to vendor-wide alias
+                    VendorStore vs = new VendorStore(HomeActivity.this);
+                    vs.setCategory(key, newCategory);
+                    if (!newMerchant.equals(t.getMerchant())) {
+                        aliasStore.setAlias(key, newMerchant);
+                    }
                 }
 
                 // Save per-message overrides for Gmail transactions
@@ -2140,12 +2147,28 @@ public class HomeActivity extends AppCompatActivity {
                     }
                 }
 
-                // Update ALL existing transactions from this vendor immediately (merchant + category)
+                // Build subject-keywords for matching other transactions
+                List<String> ruleKeywords = (senderEmail != null && txSubject != null)
+                        ? SubjectRuleStore.extractKeywords(txSubject) : Collections.emptyList();
+
+                // Update matching transactions (merchant + category)
                 for (int i = 0; i < allTransactions.size(); i++) {
                     Transaction tx = allTransactions.get(i);
                     String txKey = tx.getRawVendor() != null ? tx.getRawVendor() : tx.getMerchant();
-                    boolean matchByKey = key.equals(txKey);
                     boolean matchById = msgId != null && msgId.equals(tx.getMessageId());
+
+                    // Match by subject keywords when available, otherwise fall back to vendor key
+                    boolean matchBySubject = false;
+                    if (!ruleKeywords.isEmpty() && senderEmail != null) {
+                        String txSender = tx.getSenderEmail();
+                        String txSubj = tx.getSubject();
+                        if (txSender != null && txSender.equals(senderEmail) && txSubj != null) {
+                            List<String> txKws = SubjectRuleStore.extractKeywords(txSubj);
+                            matchBySubject = txKws.containsAll(ruleKeywords);
+                        }
+                    }
+                    boolean matchByKey = ruleKeywords.isEmpty() && key.equals(txKey);
+
                     if (matchById) {
                         // Update this specific transaction with ALL edits
                         allTransactions.set(i, new Transaction(
@@ -2154,8 +2177,8 @@ public class HomeActivity extends AppCompatActivity {
                                 selectedType[0], tx.getSenderEmail(), tx.getSubject(),
                                 tx.getMessageId(), tx.getRawVendor()
                         ));
-                    } else if (matchByKey) {
-                        // Other transactions from same vendor: merchant + category only
+                    } else if (matchBySubject || matchByKey) {
+                        // Other transactions matching the same subject rule or vendor key
                         allTransactions.set(i, new Transaction(
                                 newMerchant, tx.getAmount(), tx.getDateMillis(),
                                 tx.getDateDisplay(), newCategory, tx.getAvatarLetter(),
@@ -3484,6 +3507,114 @@ public class HomeActivity extends AppCompatActivity {
             list.addView(container);
         }
         findViewById(R.id.btn_add_nickname).setOnClickListener(v -> showAddNicknameDialog());
+
+        // ── Subject Rules Section ──
+        loadSubjectRulesSection();
+    }
+
+    private void loadSubjectRulesSection() {
+        LinearLayout root = findViewById(R.id.container_nicknames_list);
+        SubjectRuleStore srs = new SubjectRuleStore(this);
+        Map<String, Map<String, SubjectRuleStore.SubjectRule>> allRules = srs.getAll();
+
+        boolean hasRules = false;
+        for (Map.Entry<String, Map<String, SubjectRuleStore.SubjectRule>> senderEntry : allRules.entrySet()) {
+            for (SubjectRuleStore.SubjectRule rule : senderEntry.getValue().values()) {
+                if (rule.alias != null || rule.category != null) {
+                    hasRules = true;
+                    break;
+                }
+            }
+            if (hasRules) break;
+        }
+
+        if (!hasRules) return;
+
+        // Section header
+        TextView header = new TextView(this);
+        header.setText("Subject-Based Rules");
+        header.setTextSize(13);
+        header.setTextColor(0xFF888888);
+        header.setPadding(dp(16), dp(20), dp(16), dp(8));
+        root.addView(header);
+
+        CardView container = createCardContainer();
+        LinearLayout inner = createCardInner();
+        boolean first = true;
+
+        for (Map.Entry<String, Map<String, SubjectRuleStore.SubjectRule>> senderEntry : allRules.entrySet()) {
+            String sender = senderEntry.getKey();
+            for (SubjectRuleStore.SubjectRule rule : senderEntry.getValue().values()) {
+                if (rule.alias == null && rule.category == null) continue;
+
+                if (!first) addDivider(inner);
+                first = false;
+
+                LinearLayout row = createCardRow();
+                LinearLayout textCol = new LinearLayout(this);
+                textCol.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+                textCol.setOrientation(LinearLayout.VERTICAL);
+
+                TextView tvSender = new TextView(this);
+                tvSender.setText(sender);
+                tvSender.setTextSize(10);
+                tvSender.setTextColor(0xFFAAAAAA);
+                textCol.addView(tvSender);
+
+                TextView tvSubject = new TextView(this);
+                tvSubject.setText("Subject: " + rule.keywordsKey.replace(",", ", "));
+                tvSubject.setTextSize(11);
+                tvSubject.setTextColor(0xFF888888);
+                textCol.addView(tvSubject);
+
+                if (rule.alias != null) {
+                    TextView tvAlias = new TextView(this);
+                    tvAlias.setText("→ " + rule.alias);
+                    tvAlias.setTextSize(14);
+                    tvAlias.setTextColor(0xFF000000);
+                    tvAlias.setTypeface(null, android.graphics.Typeface.BOLD);
+                    textCol.addView(tvAlias);
+                }
+
+                if (rule.category != null) {
+                    TextView tvCat = new TextView(this);
+                    tvCat.setText("  [" + rule.category + "]");
+                    tvCat.setTextSize(12);
+                    tvCat.setTextColor(0xFFF9A84D);
+                    textCol.addView(tvCat);
+                }
+
+                row.addView(textCol);
+
+                TextView btnDelete = new TextView(this);
+                btnDelete.setText("Delete");
+                btnDelete.setTextSize(13);
+                btnDelete.setTextColor(0xFFE53935);
+                btnDelete.setTypeface(null, android.graphics.Typeface.BOLD);
+                btnDelete.setPadding(dp(12), dp(8), dp(12), dp(8));
+                btnDelete.setClickable(true);
+                btnDelete.setFocusable(true);
+                String finalSender = sender;
+                String finalKey = rule.keywordsKey;
+                btnDelete.setOnClickListener(v -> {
+                    new AlertDialog.Builder(this)
+                            .setTitle("Delete Subject Rule")
+                            .setMessage("Remove rule for \"" + finalSender + "\" with subject keywords \"" + finalKey.replace(",", ", ") + "\"?")
+                            .setPositiveButton("Delete", (dialog, which) -> {
+                                srs.removeRule(finalSender, finalKey);
+                                loadSettingsNicknames();
+                                Toast.makeText(this, "Rule removed", Toast.LENGTH_SHORT).show();
+                            })
+                            .setNegativeButton("Cancel", null)
+                            .show();
+                });
+                row.addView(btnDelete);
+                inner.addView(row);
+            }
+        }
+
+        container.addView(inner);
+        root.addView(container);
     }
 
     private LinearLayout createNicknameRow(String original, String alias) {
