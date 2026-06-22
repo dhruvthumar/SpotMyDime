@@ -388,25 +388,65 @@ public class GmailFetcher {
 
                 } else if (res != null && res.category.equals("Other")) {
                     // AI says it IS a transaction, just couldn't pin a specific
-                    // category — still use its merchant/amount if present.
+                    // category. If the sender is from a personal domain with no
+                    // identifiable vendor, discard it to avoid surfacing spam.
+                    if (messageId != null) {
+                        String emailAddr = extractEmailFromHeader(from);
+                        if (emailAddr != null && isPersonalEmailDomain(emailAddr)) {
+                            boolean hasUserOverride = (overrides != null && overrides.getType(messageId) != null);
+                            if (!hasUserOverride) {
+                                Log.d(TAG, "DISCARD (Other + personal domain): " + subject);
+                                if (aiCache != null) {
+                                    aiCache.put(messageId, null, "__NOT_A_TRANSACTION__", null, null, "outgoing");
+                                }
+                                return null;
+                            }
+                        }
+                    }
                     modelAmount = res.amount;
                     if (res.vendor != null && !res.vendor.isEmpty()) aiMerchant = res.vendor;
                     category = guessCategoryFallback(vendor, subject);
 
-                    // Cache even "Other" result so we don't re-query Gemini for the same email
                     if (aiCache != null && messageId != null) {
                         aiCache.put(messageId, aiMerchant, category, modelAmount, modelDate,
                                 res.type != null ? res.type : "outgoing");
                     }
                 } else {
-                    // AI failed (network/parse error, null response) — fall back to keyword rules.
-                    // Deliberately NOT cached and NOT excluded, so a transient Gemini
-                    // failure gets retried on the next sync instead of being permanently
-                    // stuck with a guessed category.
+                    // AI failed (network/parse error, null response).
+                    // If the sender is from a personal domain, discard permanently
+                    // rather than falling through to keyword guess which may
+                    // assign a real-sounding category to spam.
+                    String emailAddr = extractEmailFromHeader(from);
+                    if (emailAddr != null && isPersonalEmailDomain(emailAddr)) {
+                        boolean hasUserOverride = (messageId != null && overrides != null
+                                && overrides.getType(messageId) != null);
+                        if (!hasUserOverride) {
+                            Log.d(TAG, "DISCARD (Gemini failed + personal domain): " + subject);
+                            if (aiCache != null && messageId != null) {
+                                aiCache.put(messageId, null, "__NOT_A_TRANSACTION__", null, null, "outgoing");
+                            }
+                            return null;
+                        }
+                    }
+                    // Deliberately NOT cached otherwise, so a transient Gemini
+                    // failure gets retried on the next sync.
                     category = guessCategoryFallback(vendor, subject);
                 }
             } else {
-                // Not transactional by heuristic — keyword fallback only
+                // Not transactional by heuristic — if the sender is from a
+                // personal domain, discard rather than guessing categories.
+                String emailAddr = extractEmailFromHeader(from);
+                if (emailAddr != null && isPersonalEmailDomain(emailAddr)) {
+                    boolean hasUserOverride = (messageId != null && overrides != null
+                            && overrides.getType(messageId) != null);
+                    if (!hasUserOverride) {
+                        Log.d(TAG, "DISCARD (heuristic fail + personal domain): " + subject);
+                        if (aiCache != null && messageId != null) {
+                            aiCache.put(messageId, null, "__NOT_A_TRANSACTION__", null, null, "outgoing");
+                        }
+                        return null;
+                    }
+                }
                 category = guessCategoryFallback(vendor, subject);
             }
         }

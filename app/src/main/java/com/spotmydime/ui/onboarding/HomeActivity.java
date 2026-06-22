@@ -145,8 +145,7 @@ public class HomeActivity extends AppCompatActivity {
     private TextView tvIncomeTotal;
     private TextView tvIncomeTrend;
     private LinearLayout containerIncomeSources;
-    private TextView tvNextIncomeCountdown;
-    private TextView tvNextIncomeDate;
+
     private TextView tvIncomeComparisonPct;
     private TextView tvTrendsTotal;
     private TextView tvTrendsIndicator;
@@ -247,8 +246,6 @@ public class HomeActivity extends AppCompatActivity {
         tvIncomeTotal = findViewById(R.id.tv_income_total);
         tvIncomeTrend = findViewById(R.id.tv_income_trend);
         containerIncomeSources = findViewById(R.id.container_income_sources);
-        tvNextIncomeCountdown = findViewById(R.id.tv_next_income_countdown);
-        tvNextIncomeDate = findViewById(R.id.tv_next_income_date);
         tvIncomeComparisonPct = findViewById(R.id.tv_income_comparison_pct);
         tvTrendsTotal = findViewById(R.id.tv_trends_total);
         tvTrendsIndicator = findViewById(R.id.tv_trends_indicator);
@@ -582,7 +579,7 @@ public class HomeActivity extends AppCompatActivity {
         double pctOut = hasPrevOut ? ((totalOut - prevOut) / Math.abs(prevOut)) * 100 : 0;
 
         tvInsightsNet.setText(formatCurrency(totalOut));
-        tvInsightsNetLabel.setText("Total Spending");
+        tvInsightsNetLabel.setText("Overview");
         if (hasPrevOut) {
             String outArrow = pctOut <= 0 ? "↓" : "↑";
             tvInsightsTrend.setText(outArrow + " " + String.format("%.0f", Math.abs(pctOut)) + "% vs last month");
@@ -613,27 +610,53 @@ public class HomeActivity extends AppCompatActivity {
     private List<String> generateInsights(double totalIn, double totalOut, List<Transaction> txs) {
         List<String> results = new ArrayList<>();
         Map<String, Double> catTotals = new HashMap<>();
+        Map<String, Integer> catTxCount = new HashMap<>();
+        Map<String, Integer> merchantFreq = new HashMap<>();
+        double largestTxAmt = 0;
+        String largestTxMerchant = "";
+        Calendar cal = Calendar.getInstance();
+        int daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH);
+        Set<Integer> spendDays = new HashSet<>();
+
         for (Transaction t : txs) {
             if (t.getType() == Transaction.Type.OUTGOING) {
                 double cur = catTotals.getOrDefault(t.getCategory(), 0.0);
                 catTotals.put(t.getCategory(), cur + t.getAmount());
+                catTxCount.put(t.getCategory(), catTxCount.getOrDefault(t.getCategory(), 0) + 1);
+
+                String m = t.getMerchant() != null ? t.getMerchant().toLowerCase() : "";
+                if (!m.isEmpty()) merchantFreq.put(m, merchantFreq.getOrDefault(m, 0) + 1);
+
+                if (t.getAmount() > largestTxAmt) {
+                    largestTxAmt = t.getAmount();
+                    largestTxMerchant = t.getMerchant() != null ? t.getMerchant() : "";
+                }
+
+                cal.setTimeInMillis(t.getDateMillis());
+                spendDays.add(cal.get(Calendar.DAY_OF_MONTH));
             }
         }
+
         List<Map.Entry<String, Double>> sorted = new ArrayList<>(catTotals.entrySet());
         sorted.sort((a, b) -> Double.compare(b.getValue(), a.getValue()));
 
         if (sorted.isEmpty() && totalIn == 0) return results;
 
-        // Warning: largest category
+        // 1. Category concentration warning (keep existing)
         if (!sorted.isEmpty()) {
             Map.Entry<String, Double> top = sorted.get(0);
             double pctOfTotal = totalOut > 0 ? (top.getValue() / totalOut) * 100 : 0;
             if (pctOfTotal > 40) {
                 results.add("⚠ Warning: " + top.getKey() + " accounts for " + String.format("%.0f", pctOfTotal) + "% of your spending this month.");
             }
+            if (sorted.size() >= 2) {
+                Map.Entry<String, Double> second = sorted.get(1);
+                double pct2 = totalOut > 0 ? (second.getValue() / totalOut) * 100 : 0;
+                results.add("Top categories: " + top.getKey() + " (" + String.format("%.0f", pctOfTotal) + "%) and " + second.getKey() + " (" + String.format("%.0f", pct2) + "%) make up most of your spending.");
+            }
         }
 
-        // Tip: savings rate
+        // 2. Savings rate tip (keep existing)
         double savingsRate = totalIn > 0 ? ((totalIn - totalOut) / totalIn) * 100 : 0;
         if (savingsRate > 20) {
             results.add("💡 Tip: Great savings rate of " + String.format("%.0f", savingsRate) + "%! Consider investing the excess.");
@@ -641,13 +664,95 @@ public class HomeActivity extends AppCompatActivity {
             results.add("💡 Tip: Savings rate is low (" + String.format("%.0f", savingsRate) + "%). Try reducing non-essential spending.");
         }
 
-        // Forecast: recurring patterns
+        // 3. No-spend days
+        int noSpendDays = daysInMonth - spendDays.size();
+        if (noSpendDays > 5) {
+            results.add("🏆 You had " + noSpendDays + " no-spend day" + (noSpendDays != 1 ? "s" : "") + " this month — great discipline!");
+        }
+
+        // 4. Income vs expense ratio
+        if (totalOut > 0 && totalIn > 0) {
+            double ratio = totalIn / totalOut;
+            if (ratio > 1.8) {
+                results.add("✅ Your income (" + formatCurrency(totalIn) + ") covers expenses " + String.format("%.1f", ratio) + "x over — healthy financial position.");
+            } else if (ratio < 1.0) {
+                results.add("⚠ Your spending exceeds income by " + formatCurrency(totalOut - totalIn) + ". Consider reviewing your expenses.");
+            }
+        }
+
+        // 5. Most frequent merchant
+        if (!merchantFreq.isEmpty()) {
+            Map.Entry<String, Integer> topMerchant = null;
+            for (Map.Entry<String, Integer> e : merchantFreq.entrySet()) {
+                if (topMerchant == null || e.getValue() > topMerchant.getValue()) topMerchant = e;
+            }
+            if (topMerchant != null && topMerchant.getValue() >= 3) {
+                String name = topMerchant.getKey();
+                name = name.substring(0, 1).toUpperCase() + name.substring(1);
+                results.add("🏪 " + name + " appeared " + topMerchant.getValue() + " time" + (topMerchant.getValue() > 1 ? "s" : "") + " — your most frequent merchant.");
+            }
+        }
+
+        // 6. Largest transaction
+        if (largestTxAmt > 0 && totalOut > 0) {
+            double pctOfTotal = (largestTxAmt / totalOut) * 100;
+            if (pctOfTotal > 25) {
+                String name = largestTxMerchant.isEmpty() ? "A single purchase" : largestTxMerchant;
+                results.add("📈 " + name + " (" + formatCurrency(largestTxAmt) + ") was " + String.format("%.0f", pctOfTotal) + "% of your total spending.");
+            }
+        }
+
+        // 7. End-of-month rush
+        int last7Days = 0;
+        double last7Amount = 0;
+        for (Transaction t : txs) {
+            if (t.getType() == Transaction.Type.OUTGOING) {
+                cal.setTimeInMillis(t.getDateMillis());
+                int day = cal.get(Calendar.DAY_OF_MONTH);
+                if (day > daysInMonth - 7) {
+                    last7Days++;
+                    last7Amount += t.getAmount();
+                }
+            }
+        }
+        if (totalOut > 0 && last7Days >= 3) {
+            double pctLast7 = last7Amount / totalOut * 100;
+            if (pctLast7 > 40) {
+                results.add("⏰ " + String.format("%.0f", pctLast7) + "% of spending happened in the last 7 days. Try pacing purchases throughout the month.");
+            }
+        }
+
+        // 8. Category change vs last month (top 3)
+        int prevMonth = selectedInsightMonth == 0 ? 11 : selectedInsightMonth - 1;
+        int prevYear = selectedInsightMonth == 0 ? selectedInsightYear - 1 : selectedInsightYear;
+        List<Transaction> prevTxs = getTransactionsForMonth(prevYear, prevMonth);
+        Map<String, Double> prevCatTotals = new HashMap<>();
+        for (Transaction t : prevTxs) {
+            if (t.getType() == Transaction.Type.OUTGOING) {
+                prevCatTotals.put(t.getCategory(), prevCatTotals.getOrDefault(t.getCategory(), 0.0) + t.getAmount());
+            }
+        }
+        if (!prevCatTotals.isEmpty()) {
+            for (int i = 0; i < Math.min(3, sorted.size()); i++) {
+                Map.Entry<String, Double> entry = sorted.get(i);
+                double prevAmt = prevCatTotals.getOrDefault(entry.getKey(), 0.0);
+                if (prevAmt > 0) {
+                    double pctChangeCat = ((entry.getValue() - prevAmt) / prevAmt) * 100;
+                    String arrow = pctChangeCat >= 0 ? "↑" : "↓";
+                    String direction = pctChangeCat >= 0 ? "up" : "down";
+                    String word = pctChangeCat >= 0 ? "increase" : "decrease";
+                    results.add(arrow + " " + entry.getKey() + " spending " + direction + " " + String.format("%.0f", Math.abs(pctChangeCat)) + "% vs last month.");
+                    break;
+                }
+            }
+        }
+
+        // 9. Recurring patterns (keep existing)
         Set<String> recurringVendors = new HashSet<>();
         Map<String, Integer> vendorMonths = new HashMap<>();
         for (Transaction t : allTransactions) {
             String key = t.getMerchant() != null ? t.getMerchant().toLowerCase() : "";
             if (key.isEmpty()) continue;
-            Calendar cal = Calendar.getInstance();
             cal.setTimeInMillis(t.getDateMillis());
             int ym = cal.get(Calendar.YEAR) * 12 + cal.get(Calendar.MONTH);
             if (vendorMonths.containsKey(key)) {
@@ -657,7 +762,29 @@ public class HomeActivity extends AppCompatActivity {
             vendorMonths.put(key, ym);
         }
         if (!recurringVendors.isEmpty()) {
-            results.add("📊 Forecast: " + recurringVendors.size() + " recurring merchants detected. Budget accordingly for next month.");
+            StringBuilder subNames = new StringBuilder();
+            int count = 0;
+            for (String v : recurringVendors) {
+                if (count >= 2) break;
+                if (subNames.length() > 0) subNames.append(", ");
+                subNames.append(v.substring(0, 1).toUpperCase()).append(v.substring(1));
+                count++;
+            }
+            if (recurringVendors.size() <= 2) {
+                results.add("📊 Recurring: " + subNames + " charge" + (count > 1 ? "" : "s") + " you every month.");
+            } else {
+                results.add("📊 You have " + recurringVendors.size() + " recurring merchants (e.g. " + subNames + "). Budget accordingly.");
+            }
+        }
+
+        // 10. Average transaction size
+        int outCount = 0;
+        for (Transaction t : txs) {
+            if (t.getType() == Transaction.Type.OUTGOING) outCount++;
+        }
+        if (outCount >= 3 && totalOut > 0) {
+            double avgTx = totalOut / outCount;
+            results.add("Your average transaction is " + formatCurrency(avgTx) + " across " + outCount + " purchases.");
         }
 
         return results;
@@ -741,11 +868,27 @@ public class HomeActivity extends AppCompatActivity {
                         if (!trimmed.isEmpty()) insights.add(trimmed);
                     }
                     if (!insights.isEmpty()) {
-                        runOnUiThread(() -> renderInsightList(insights));
+                        runOnUiThread(() -> appendInsights(insights));
                     }
                 }
             } catch (Exception ignored) {}
         }).start();
+    }
+
+    private void appendInsights(List<String> items) {
+        for (String item : items) {
+            TextView tv = new TextView(this);
+            tv.setText("• " + item);
+            tv.setTextSize(13);
+            tv.setTextColor(0xFF555555);
+            tv.setLineSpacing(8, 1);
+            tv.setPadding(0, 0, 0, 0);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.bottomMargin = dp(10);
+            tv.setLayoutParams(lp);
+            containerInsightsForYou.addView(tv);
+        }
     }
 
     // ── SCREEN 2: SPENDING ──
@@ -996,67 +1139,6 @@ public class HomeActivity extends AppCompatActivity {
             containerIncomeSources.addView(sourceRow);
         }
 
-        // Next expected income
-        List<Transaction> incomeTxs = new ArrayList<>();
-        Calendar cal = Calendar.getInstance();
-        for (Transaction t : allTransactions) {
-            if (t.getType() == Transaction.Type.INCOMING) {
-                incomeTxs.add(t);
-            }
-        }
-        incomeTxs.sort((a, b) -> Long.compare(a.getDateMillis(), b.getDateMillis()));
-
-        String nextDateStr = "—";
-        String countdownStr = "No recurring income";
-        int maxDay = 0;
-        Map<String, Integer> incomeDays = new HashMap<>();
-        for (Transaction t : incomeTxs) {
-            cal.setTimeInMillis(t.getDateMillis());
-            int day = cal.get(Calendar.DAY_OF_MONTH);
-            String key = t.getMerchant() != null ? t.getMerchant().toLowerCase() : "";
-            if (!key.isEmpty()) {
-                incomeDays.put(key, day);
-                if (day > maxDay) maxDay = day;
-            }
-        }
-        Map<Integer, Integer> dayFreq = new HashMap<>();
-        for (int d : incomeDays.values()) {
-            dayFreq.put(d, dayFreq.getOrDefault(d, 0) + 1);
-        }
-        int predictedDay = 1;
-        int maxFreq = 0;
-        for (Map.Entry<Integer, Integer> e : dayFreq.entrySet()) {
-            if (e.getValue() > maxFreq) {
-                maxFreq = e.getValue();
-                predictedDay = e.getKey();
-            }
-        }
-
-        Calendar now = Calendar.getInstance();
-        Calendar nextIncome = Calendar.getInstance();
-        nextIncome.set(Calendar.DAY_OF_MONTH, predictedDay);
-        if (nextIncome.get(Calendar.DAY_OF_MONTH) < now.get(Calendar.DAY_OF_MONTH)) {
-            nextIncome.add(Calendar.MONTH, 1);
-        }
-        long diffMs = nextIncome.getTimeInMillis() - now.getTimeInMillis();
-        long diffDays = diffMs / (1000 * 60 * 60 * 24);
-        if (diffDays < 0) diffDays = 0;
-
-        if (maxFreq > 0) {
-            nextDateStr = sdf.format(nextIncome.getTime());
-            if (diffDays == 0) {
-                countdownStr = "Today!";
-                tvNextIncomeCountdown.setTextColor(0xFFF9A84D);
-            } else {
-                countdownStr = "In " + diffDays + " day" + (diffDays != 1 ? "s" : "");
-                tvNextIncomeCountdown.setTextColor(0xFF2B9348);
-            }
-        } else {
-            tvNextIncomeCountdown.setTextColor(0xFF2B9348);
-        }
-
-        tvNextIncomeCountdown.setText(countdownStr);
-        tvNextIncomeDate.setText(nextDateStr);
 
         ((TextView) findViewById(R.id.tv_income_dropdown)).setText(formatMonthYear(selectedInsightYear, selectedInsightMonth) + " ▼");
     }
@@ -1386,9 +1468,26 @@ public class HomeActivity extends AppCompatActivity {
                             : loadTransactionsFromCache();
                     if (previouslyKnown == null) previouslyKnown = new ArrayList<>();
 
+                    // Strip from previouslyKnown any manual transactions that
+                    // have been deleted (i.e. no longer present in fresh `manual` list)
+                    Set<String> manualIds = new HashSet<>();
+                    for (Transaction m : manual) {
+                        if (m.getMessageId() != null) manualIds.add(m.getMessageId());
+                    }
+                    List<Transaction> known = new ArrayList<>();
+                    for (Transaction pk : previouslyKnown) {
+                        if (pk.getMessageId() != null && pk.getMessageId().startsWith("manual_")) {
+                            if (manualIds.contains(pk.getMessageId())) {
+                                known.add(pk);
+                            }
+                        } else {
+                            known.add(pk);
+                        }
+                    }
+
                     List<Transaction> merged = new ArrayList<>();
                     merged.addAll(manual);
-                    merged.addAll(previouslyKnown);
+                    merged.addAll(known);
                     merged.addAll(transactions);
                     merged.sort((a, b) -> Long.compare(b.getDateMillis(), a.getDateMillis()));
 
@@ -1529,9 +1628,8 @@ public class HomeActivity extends AppCompatActivity {
             if (t.getType() == Transaction.Type.OUTGOING) totalOutgoing += t.getAmount();
             else totalIncoming += t.getAmount();
         }
-        double netCashFlow = totalIncoming - totalOutgoing;
+        double netCashFlow = totalOutgoing - totalIncoming;
 
-        // ── Update month label and net cash flow ──
         ((TextView) findViewById(R.id.tv_month_label)).setText(monthNames[currentMonth]);
         tvTotalAmount.setText(TransactionParser.formatAmount(netCashFlow));
 
@@ -1544,7 +1642,7 @@ public class HomeActivity extends AppCompatActivity {
         double prevNet = 0;
         for (Transaction t : transactions) {
             if (t.getDateMillis() >= prevMonthStart && t.getDateMillis() < monthStart) {
-                if (t.getType() == Transaction.Type.INCOMING) prevNet += t.getAmount();
+                if (t.getType() == Transaction.Type.OUTGOING) prevNet += t.getAmount();
                 else prevNet -= t.getAmount();
             }
         }
@@ -1665,6 +1763,17 @@ public class HomeActivity extends AppCompatActivity {
             String merchant = t.getMerchant() != null ? t.getMerchant() : "?";
             ((TextView) row.findViewById(R.id.tv_avatar)).setText(merchant.substring(0, 1).toUpperCase());
 
+            ImageView ivArrow = row.findViewById(R.id.iv_transaction_arrow);
+            if (t.getType() == Transaction.Type.INCOMING) {
+                ivArrow.setImageResource(R.drawable.ic_arrow_up);
+                ivArrow.requestLayout();
+                ivArrow.setVisibility(View.VISIBLE);
+            } else {
+                ivArrow.setImageResource(R.drawable.ic_arrow_down);
+                ivArrow.requestLayout();
+                ivArrow.setVisibility(View.VISIBLE);
+            }
+
             ((TextView) row.findViewById(R.id.tv_merchant)).setText(merchant);
 
             Date d = new Date(t.getDateMillis());
@@ -1753,6 +1862,17 @@ public class HomeActivity extends AppCompatActivity {
             View row = getLayoutInflater().inflate(R.layout.item_transaction_row, containerTransactions, false);
 
             ((TextView) row.findViewById(R.id.tv_avatar)).setText(merchant.substring(0, 1).toUpperCase());
+
+            ImageView ivArrow = row.findViewById(R.id.iv_transaction_arrow);
+            if (t.getType() == Transaction.Type.INCOMING) {
+                ivArrow.setImageResource(R.drawable.ic_arrow_up);
+                ivArrow.requestLayout();
+                ivArrow.setVisibility(View.VISIBLE);
+            } else {
+                ivArrow.setImageResource(R.drawable.ic_arrow_down);
+                ivArrow.requestLayout();
+                ivArrow.setVisibility(View.VISIBLE);
+            }
             ((TextView) row.findViewById(R.id.tv_merchant)).setText(merchant);
             ((TextView) row.findViewById(R.id.tv_date)).setText(new SimpleDateFormat("MMM dd • h:mm a", Locale.US).format(d));
             ((TextView) row.findViewById(R.id.tv_amount)).setText(TransactionParser.formatAmount(t.getAmount()));

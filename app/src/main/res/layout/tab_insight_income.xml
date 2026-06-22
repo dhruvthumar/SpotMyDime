@@ -73,11 +73,19 @@
                             android:textSize="13sp" />
                     </LinearLayout>
                 </LinearLayout>
-                <View
+                <FrameLayout
                     android:layout_width="64dp"
                     android:layout_height="64dp"
-                    android:background="@drawable/circle_green"
-                    android:contentDescription="Wallet" />
+                    android:background="@drawable/circle_green">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:text="$"
+                        android:textColor="#FFFFFF"
+                        android:textSize="28sp"
+                        android:textStyle="bold" />
+                </FrameLayout>
             </LinearLayout>
         </LinearLayout>
     </androidx.cardview.widget.CardView>
@@ -98,56 +106,6 @@
         android:orientation="vertical"
         android:paddingHorizontal="20dp" />
 
-    <androidx.cardview.widget.CardView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="20dp"
-        android:layout_marginTop="14dp"
-        app:cardBackgroundColor="#FFFFFF"
-        app:cardCornerRadius="24dp"
-        app:cardElevation="2dp">
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:padding="20dp"
-            android:gravity="center_vertical">
-            <View
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="@drawable/circle_green"
-                android:contentDescription="Calendar" />
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical"
-                android:layout_marginStart="16dp">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Next Expected Income"
-                    android:textColor="#000000"
-                    android:textSize="14sp" />
-                <TextView
-                    android:id="@+id/tv_next_income_countdown"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="In 0 days"
-                    android:textColor="#2B9348"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
-                    android:layout_marginTop="2dp" />
-                <TextView
-                    android:id="@+id/tv_next_income_date"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text=""
-                    android:textColor="#000000"
-                    android:textSize="13sp" />
-            </LinearLayout>
-        </LinearLayout>
-    </androidx.cardview.widget.CardView>
 
     <androidx.cardview.widget.CardView
         android:id="@+id/card_income_comparison"
