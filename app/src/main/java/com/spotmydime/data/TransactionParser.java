@@ -9,11 +9,39 @@ import java.util.regex.Pattern;
 
 public class TransactionParser {
 
+    // Matches amounts WITH cents: $12.99, $1,200.50
     private static final Pattern AMOUNT_PATTERN =
             Pattern.compile("\\$\\s*([0-9]+(?:,[0-9]{3})*\\.[0-9]{2})");
 
+    // Matches whole-dollar amounts with NO cents: $150, $1,200
+    // (kept separate from AMOUNT_PATTERN so the decimal version is always
+    // tried first — it's more specific and less likely to misfire on things
+    // like phone numbers or order IDs prefixed with $, which whole-number
+    // matching is more prone to)
+    private static final Pattern WHOLE_DOLLAR_PATTERN =
+            Pattern.compile("\\$\\s*([0-9]+(?:,[0-9]{3})*)(?!\\.[0-9])\\b");
+
     private static final Pattern CURRENCY_AMOUNT =
             Pattern.compile("(?:total|amount|charged|paid|sum|subtotal|grand total|due|cost|price|spent|payment|balance|fee|sale)\\s*[:\\s]*\\$?\\s*([0-9]+(?:,[0-9]{3})*\\.[0-9]{2})",
+                    Pattern.CASE_INSENSITIVE);
+
+    // Same keyword set but for whole-dollar amounts (no cents)
+    private static final Pattern CURRENCY_AMOUNT_WHOLE =
+            Pattern.compile("(?:total|amount|charged|paid|sum|subtotal|grand total|due|cost|price|spent|payment|balance|fee|sale)\\s*[:\\s]*\\$?\\s*([0-9]+(?:,[0-9]{3})*)(?!\\.[0-9])\\b",
+                    Pattern.CASE_INSENSITIVE);
+
+    // Date fallback patterns, used only when the Gemini date is unavailable.
+    // Covers the formats seen in real transaction emails:
+    //   "on Jun 19, 2026"          "dated: 2026-06-19"
+    //   "Next billing date: July 21, 2026"   "Jun 1 - Jun 15, 2026" (takes the later date)
+    private static final Pattern DATE_ISO =
+            Pattern.compile("\\b(20[0-9]{2}-[01][0-9]-[0-3][0-9])\\b");
+
+    private static final Pattern DATE_MONTH_NAME =
+            Pattern.compile(
+                    "\\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|" +
+                    "Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)" +
+                    "\\.?\\s+([0-3]?[0-9]),?\\s+(20[0-9]{2})\\b",
                     Pattern.CASE_INSENSITIVE);
 
     private static final Pattern TX_KEYWORDS = Pattern.compile(
@@ -149,6 +177,28 @@ public class TransactionParser {
 
     private TransactionParser() {}
 
+    public static String extractMerchantName(String subject, String snippet, String body) {
+        String lcSubject = subject != null ? subject.toLowerCase(Locale.US) : "";
+        String lcSnippet = snippet != null ? snippet.toLowerCase(Locale.US) : "";
+        String lcBody = body != null ? body.toLowerCase(Locale.US) : "";
+
+        String merchant = extractMerchant(lcSubject, lcSnippet, lcBody);
+        if (merchant != null) return merchant;
+
+        // Try just subject-based patterns without snippet/body
+        Pattern fromPattern = Pattern.compile(
+                "(?:from|at|via)\\s+([a-z0-9'\\s.-]{2,30}?)(?:\\s+for|\\s+on|\\s+using|\\s+with|,|$|\\.)");
+        Matcher m = fromPattern.matcher(lcSubject);
+        if (m.find()) {
+            String name = m.group(1).trim();
+            if (name.length() >= 2
+                    && !name.matches(".*(?:your|the|an?|order|receipt|payment|invoice|confirmation).*")) {
+                return capitalizeWords(name);
+            }
+        }
+        return null;
+    }
+
     public static Transaction tryParse(String subject, String snippet,
                                         String fullBody, long internalDate) {
         String lcSubject = subject != null ? subject.toLowerCase(Locale.US) : "";
@@ -179,6 +229,112 @@ public class TransactionParser {
         return false;
     }
 
+    // Generic/noise words to strip from the edges of a subject-prefix candidate
+    // before treating it as a merchant name — e.g. "Spotify Premium" -> "Spotify",
+    // "DoorDash Delivery" -> "DoorDash". Deliberately conservative: only strips
+    // from the START or END of the candidate, never removes words from the middle,
+    // so multi-word merchant names like "Tim Hortons" or "Best Buy" stay intact.
+    private static final java.util.Set<String> SUBJECT_NOISE_WORDS = new java.util.HashSet<>(
+            java.util.Arrays.asList(
+                    "payment", "order", "receipt", "confirmation", "invoice", "statement",
+                    "billing", "subscription", "notification", "update", "purchase",
+                    "premium", "delivery", "monthly", "your", "annual", "weekly", "mobile"));
+
+    // Words/fragments that should never be treated as (part of) a merchant name —
+    // catches false positives like "your one-time password" or "re: fw:" chains.
+    private static final java.util.Set<String> SUBJECT_REJECT_WORDS = new java.util.HashSet<>(
+            java.util.Arrays.asList(
+                    "one", "the", "a", "an", "is", "code", "password", "verify",
+                    "verification", "re", "re:", "fw", "fw:", "fwd", "fwd:"));
+
+    private static String stripNoiseWords(String s) {
+        String[] words = s.trim().split("\\s+");
+        int start = 0, end = words.length;
+        while (start < end && SUBJECT_NOISE_WORDS.contains(words[start].toLowerCase(Locale.US))) start++;
+        while (end > start && SUBJECT_NOISE_WORDS.contains(words[end - 1].toLowerCase(Locale.US))) end--;
+        if (start >= end) return "";
+        StringBuilder sb = new StringBuilder();
+        for (int i = start; i < end; i++) {
+            if (sb.length() > 0) sb.append(" ");
+            sb.append(words[i]);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * A candidate is only treated as a possible merchant name if it contains
+     * at least one alphabetic word of length >= 3 that isn't a reject word.
+     * Filters out things like "482193", "is", "re: fw:" that would otherwise
+     * slip through as nonsense "merchant names".
+     */
+    private static boolean isValidMerchantCandidate(String s) {
+        if (s == null || s.isEmpty()) return false;
+        String[] words = s.toLowerCase(Locale.US).split("\\s+");
+        for (String w : words) {
+            String wClean = w.replaceAll("[^a-z0-9']", "");
+            if (wClean.isEmpty() || SUBJECT_REJECT_WORDS.contains(wClean)) continue;
+            if (wClean.matches("[0-9]+")) continue;
+            if (wClean.length() >= 3 && wClean.matches(".*[a-z].*")) return true;
+        }
+        return false;
+    }
+
+    // Dash must be surrounded by whitespace to count as a subject separator —
+    // otherwise "one-time" or "e-transfer" would be misread as a dash-split point.
+    private static final Pattern SUBJECT_DASH_SPLIT =
+            Pattern.compile("^(.+?)\\s+[-\u2013\u2014]\\s+(.+)$");
+
+    private static final Pattern SUBJECT_SUFFIX_WORD = Pattern.compile(
+            "\\b(?:receipt|order|payment|confirmation|invoice|statement|billing|" +
+            "subscription|notification|update|purchase)\\b",
+            Pattern.CASE_INSENSITIVE);
+
+    /**
+     * Extracts a merchant candidate from common subject-line shapes:
+     *   "X - Y"                 -> whichever side of the dash is a valid candidate
+     *                              (e.g. "Spotify Premium - Receipt" -> "Spotify",
+     *                               "Payment Confirmation - Tim Hortons" -> "Tim Hortons")
+     *   "Your X <suffix word>"  -> X (e.g. "Your Uber Receipt" -> "Uber")
+     * Returns null if nothing usable is found — caller falls through to the
+     * existing looser fromPattern/receiptPattern regexes.
+     */
+    private static String extractMerchantFromSubjectShape(String lcSubject) {
+        if (lcSubject == null || lcSubject.isEmpty()) return null;
+
+        Matcher dashMatcher = SUBJECT_DASH_SPLIT.matcher(lcSubject);
+        if (dashMatcher.matches()) {
+            String left  = stripNoiseWords(dashMatcher.group(1));
+            String right = stripNoiseWords(dashMatcher.group(2));
+            boolean leftValid  = isValidMerchantCandidate(left);
+            boolean rightValid = isValidMerchantCandidate(right);
+            String candidate = null;
+            if (leftValid && rightValid) {
+                // Both sides plausible — prefer the shorter one (closer to a
+                // single brand name), e.g. "Spotify" over "Premium Receipt"
+                candidate = (left.split("\\s+").length <= right.split("\\s+").length) ? left : right;
+            } else if (leftValid) {
+                candidate = left;
+            } else if (rightValid) {
+                candidate = right;
+            }
+            if (candidate != null && candidate.length() >= 2 && candidate.length() <= 30) {
+                return capitalizeWords(candidate);
+            }
+        }
+
+        // No dash — try "(Your )Merchant <suffix word>" shape
+        Matcher suffixMatcher = SUBJECT_SUFFIX_WORD.matcher(lcSubject);
+        if (suffixMatcher.find()) {
+            String before = lcSubject.substring(0, suffixMatcher.start()).trim();
+            String candidate = stripNoiseWords(before);
+            if (isValidMerchantCandidate(candidate) && candidate.length() >= 2 && candidate.length() <= 30) {
+                return capitalizeWords(candidate);
+            }
+        }
+
+        return null;
+    }
+
     private static String extractMerchant(String lcSubject, String lcSnippet, String lcBody) {
         for (String[] rule : MERCHANT_RULES) {
             if (lcSubject.contains(rule[0])) {
@@ -191,6 +347,17 @@ public class TransactionParser {
                 return rule[1];
             }
         }
+
+        // Subject-prefix extraction: catches merchants NOT in the hardcoded
+        // MERCHANT_RULES table by reading common subject-line shapes, e.g.
+        //   "Spotify Premium - Receipt"          -> "Spotify"
+        //   "Tim Hortons Order Confirmation"      -> "Tim Hortons"
+        //   "Your Uber Receipt"                   -> "Uber"
+        //   "Payment Confirmation - Tim Hortons"   -> "Tim Hortons"
+        // Tried before the looser fromPattern/receiptPattern regexes below,
+        // since it targets the most common real-world subject shapes more precisely.
+        String prefixMerchant = extractMerchantFromSubjectShape(lcSubject);
+        if (prefixMerchant != null) return prefixMerchant;
 
         Pattern fromPattern = Pattern.compile(
                 "(?:from|at|via)\\s+([a-z0-9'\\s.-]{2,30}?)(?:\\s+for|\\s+on|\\s+using|\\s+with|,|$|\\.)");
@@ -239,7 +406,79 @@ public class TransactionParser {
             } catch (NumberFormatException ignored) {}
         }
 
+        // Fallback: whole-dollar amounts with no cents, e.g. "Total: $150",
+        // "Charged $99 to your card". Tried only after decimal-amount patterns
+        // find nothing, since decimal amounts are the more specific/reliable signal.
+        Matcher currencyWholeMatcher = CURRENCY_AMOUNT_WHOLE.matcher(text);
+        if (currencyWholeMatcher.find()) {
+            try {
+                String raw = currencyWholeMatcher.group(1).replace(",", "");
+                double val = Double.parseDouble(raw);
+                if (val > 0.5 && val < 100000) return val;
+            } catch (NumberFormatException ignored) {}
+        }
+
+        Matcher wm = WHOLE_DOLLAR_PATTERN.matcher(text);
+        while (wm.find()) {
+            try {
+                String raw = wm.group(1).replace(",", "");
+                double val = Double.parseDouble(raw);
+                String before = text.substring(Math.max(0, wm.start() - 20), wm.start()).toLowerCase(Locale.US);
+                if (before.matches(".*\\b(?:total|amount|paid|charged|due|cost|price|subtotal|grand total|sum|sale|spent|payment|balance|fee|\\$)\\b.*")) {
+                    if (val > 0.5 && val < 100000) return val;
+                } else {
+                    if (val > 0.5 && val < 10000) return val;
+                }
+            } catch (NumberFormatException ignored) {}
+        }
+
         return 0.0;
+    }
+
+    /**
+     * Date fallback for when the AI didn't return a usable date (rate-limited,
+     * skipped, or failed). Looks for explicit dates in the email text and
+     * returns millis, or null if nothing found (caller should fall back to
+     * the Gmail internalDate in that case).
+     *
+     * For date ranges like "Jun 1 - Jun 15, 2026" or "Next billing date: July 21, 2026",
+     * this returns the LAST date found in the text — for a range that's the more
+     * relevant boundary (e.g. billing period end, statement date), and for a
+     * single explicit date it's simply that date.
+     */
+    public static Long extractDateMillis(String text) {
+        if (text == null || text.isEmpty()) return null;
+
+        Long lastFound = null;
+
+        Matcher isoMatcher = DATE_ISO.matcher(text);
+        while (isoMatcher.find()) {
+            try {
+                Date d = new SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(isoMatcher.group(1));
+                if (d != null) lastFound = d.getTime();
+            } catch (Exception ignored) {}
+        }
+
+        Matcher nameMatcher = DATE_MONTH_NAME.matcher(text);
+        while (nameMatcher.find()) {
+            try {
+                String monthStr = nameMatcher.group(1);
+                String dayStr   = nameMatcher.group(2);
+                String yearStr  = nameMatcher.group(3);
+                String normalized = monthStr + " " + dayStr + ", " + yearStr;
+                Date d = null;
+                // Try long-form then short-form month parsing
+                for (String pattern : new String[]{"MMMM d, yyyy", "MMM d, yyyy"}) {
+                    try {
+                        d = new SimpleDateFormat(pattern, Locale.US).parse(normalized);
+                        if (d != null) break;
+                    } catch (Exception ignored) {}
+                }
+                if (d != null) lastFound = d.getTime();
+            } catch (Exception ignored) {}
+        }
+
+        return lastFound;
     }
 
     private static String guessCategory(String merchant) {

@@ -58,11 +58,29 @@ public class GmailFetcher {
     // ── Fetch entry point ─────────────────────────────────────────────────────
 
     public static void fetchTransactions(Context context, Callback callback) {
-        fetchTransactions(context, callback, null);
+        // No explicit afterDate given — use incremental sync: only ask Gmail
+        // for messages newer than the last successful sync (with a small
+        // overlap window). Falls back to the wide default on first-ever sync.
+        SyncStateStore syncState = new SyncStateStore(context);
+        String incrementalAfter = syncState.getQueryAfterDate("2026/01/01");
+        fetchTransactionsInternal(context, callback, incrementalAfter, true);
     }
 
+    /**
+     * Explicit afterDate overload — bypasses incremental sync and does NOT
+     * update the sync watermark (so it's safe to use for one-off date-range
+     * queries, e.g. a settings "view a specific month" action, without
+     * corrupting the incremental sync state used by the no-arg overload).
+     * Use the no-arg overload for normal app-open/refresh flows.
+     */
     public static void fetchTransactions(Context context, Callback callback, String afterDate) {
+        fetchTransactionsInternal(context, callback, afterDate, false);
+    }
+
+    private static void fetchTransactionsInternal(Context context, Callback callback,
+                                                   String afterDate, boolean updateSyncState) {
         final String effectiveAfter = (afterDate != null) ? afterDate : "2026/01/01";
+        final SyncStateStore syncState = updateSyncState ? new SyncStateStore(context) : null;
         new Thread(() -> {
             try {
                 GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(context);
@@ -118,6 +136,7 @@ public class GmailFetcher {
 
                 List<Transaction> results = new ArrayList<>();
                 int max = Math.min(messages.length(), 60);
+                long newestSeenMillis = 0;
 
                 for (int i = 0; i < max; i++) {
                     String msgId = messages.getJSONObject(i).getString("id");
@@ -125,6 +144,15 @@ public class GmailFetcher {
 
                     String msgJson = executeGet(
                             GMAIL_API + "/messages/" + msgId + "?format=full", token);
+
+                    // Track newest internalDate across ALL fetched messages, even ones
+                    // that don't parse into a transaction — otherwise a burst of
+                    // non-transactional mail would never advance the sync watermark
+                    // and we'd keep re-fetching them every time.
+                    try {
+                        long msgDate = new JSONObject(msgJson).optLong("internalDate", 0);
+                        if (msgDate > newestSeenMillis) newestSeenMillis = msgDate;
+                    } catch (Exception ignored) {}
 
                     Transaction t = parseMessage(msgJson, vendorStore, aliasStore, overrides, aiCache, msgId);
                     if (t != null) {
@@ -134,6 +162,15 @@ public class GmailFetcher {
                                 + "  [" + t.getCategory() + "]"
                                 + "  " + t.getType());
                     }
+                }
+
+                // Advance the sync watermark so the next fetch only asks Gmail for
+                // messages newer than this (minus the overlap window in SyncStateStore).
+                // syncState is null when this call came from the explicit-afterDate
+                // overload (updateSyncState=false) — that path intentionally never
+                // touches the watermark.
+                if (newestSeenMillis > 0 && syncState != null) {
+                    syncState.updateLastSyncedMillis(newestSeenMillis);
                 }
 
                 Collections.sort(results, (a, b) -> Long.compare(b.getDateMillis(), a.getDateMillis()));
@@ -271,6 +308,12 @@ public class GmailFetcher {
         String               aiMerchant  = null;
 
         if (cachedAi != null) {
+            // Cached verdict from a previous sync says this message is NOT a
+            // real transaction — discard again without calling Gemini.
+            if ("__NOT_A_TRANSACTION__".equals(cachedAi.category)) {
+                Log.d(TAG, "DISCARD (cached: not a transaction): " + subject);
+                return null;
+            }
             // Use cached AI result — no Gemini call needed
             category   = cachedAi.category;
             modelAmount = cachedAi.amount;
@@ -284,7 +327,21 @@ public class GmailFetcher {
                 // PRIMARY: call Gemini with subject + body
                 res = GeminiClassifier.classifyFull(vendor, subject, snippet, fullBody);
 
-                if (res != null && !res.category.equals("Other")) {
+                if (res != null && !res.isTransaction) {
+                    // AI explicitly says this is NOT a real transaction (promo,
+                    // newsletter, balance check, "you owe" reminder, etc.) —
+                    // discard it instead of guessing a category and keeping it.
+                    // Caching the verdict (even though category is a sentinel,
+                    // not a real category) means the next sync sees cachedAi != null
+                    // and skips straight past TransactionClassifier/Gemini entirely
+                    // for this exact message — no re-call, no re-guess.
+                    if (aiCache != null && messageId != null) {
+                        aiCache.put(messageId, null, "__NOT_A_TRANSACTION__", null, null, "outgoing");
+                    }
+                    Log.d(TAG, "DISCARD (AI says not a transaction): " + subject);
+                    return null;
+
+                } else if (res != null && !res.category.equals("Other")) {
                     category   = res.category;
                     modelAmount = res.amount;
                     modelDate   = res.dateStr;
@@ -301,7 +358,8 @@ public class GmailFetcher {
                     }
 
                 } else if (res != null && res.category.equals("Other")) {
-                    // AI returned Other — still use its merchant/amount if present
+                    // AI says it IS a transaction, just couldn't pin a specific
+                    // category — still use its merchant/amount if present.
                     modelAmount = res.amount;
                     if (res.vendor != null && !res.vendor.isEmpty()) aiMerchant = res.vendor;
                     category = guessCategoryFallback(vendor, subject);
@@ -312,7 +370,10 @@ public class GmailFetcher {
                                 res.type != null ? res.type : "outgoing");
                     }
                 } else {
-                    // AI failed — fall back to keyword rules
+                    // AI failed (network/parse error, null response) — fall back to keyword rules.
+                    // Deliberately NOT cached and NOT excluded, so a transient Gemini
+                    // failure gets retried on the next sync instead of being permanently
+                    // stuck with a guessed category.
                     category = guessCategoryFallback(vendor, subject);
                 }
             } else {
@@ -337,14 +398,19 @@ public class GmailFetcher {
         }
 
         // ── Resolve final merchant display name ──
-        // Priority: AI nickname > alias store > From header name > subject
+        // Priority: AI nickname > TransactionParser fallback > alias store > From header > subject
         String merchant;
         if (aiMerchant != null && !aiMerchant.isEmpty()) {
             merchant = aiMerchant;
-        } else if (vendor != null && !vendor.isEmpty()) {
-            merchant = vendor;
         } else {
-            merchant = subject;
+            String parsedMerchant = TransactionParser.extractMerchantName(subject, snippet, fullBody);
+            if (parsedMerchant != null) {
+                merchant = parsedMerchant;
+            } else if (vendor != null && !vendor.isEmpty()) {
+                merchant = vendor;
+            } else {
+                merchant = subject;
+            }
         }
 
         // ── Resolve amount ──
@@ -355,12 +421,20 @@ public class GmailFetcher {
                 : TransactionParser.extractAmount(searchText);
 
         // ── Resolve date ──
+        // Priority: AI date > regex fallback from email text > Gmail internalDate.
+        // The regex fallback matters specifically when Gemini was skipped (rate
+        // limited, not transactional by heuristic) or returned no date — without
+        // it we'd silently use the email's RECEIVED date instead of the actual
+        // transaction/billing date mentioned in the body.
         long finalDateMillis = internalDate;
         if (modelDate != null) {
             try {
                 Date parsed = new SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(modelDate);
                 if (parsed != null) finalDateMillis = parsed.getTime();
             } catch (ParseException ignored) {}
+        } else {
+            Long regexDate = TransactionParser.extractDateMillis(searchText);
+            if (regexDate != null) finalDateMillis = regexDate;
         }
         String dateDisplay = new SimpleDateFormat("MMM dd", Locale.US).format(new Date(finalDateMillis));
 

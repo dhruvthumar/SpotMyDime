@@ -272,10 +272,11 @@ public class GeminiClassifier {
             String type      = out.optString("type", "outgoing");
             String date      = out.optString("date", "");
 
-            // If model says not a transaction, still return result so caller
-            // can decide to skip or mark as Other
+            // If model says not a transaction, return a result that clearly
+            // signals that — caller (GmailFetcher) checks isTransaction and
+            // discards the email instead of creating a Transaction for it.
             if (!isTxn) {
-                return new ClassificationResult("Other", merchant, null, "outgoing", null);
+                return new ClassificationResult("Other", merchant, null, "outgoing", null, false);
             }
 
             // Parse amount
@@ -288,7 +289,7 @@ public class GeminiClassifier {
 
             String dateResult = (date != null && date.matches("\\d{4}-\\d{2}-\\d{2}")) ? date : null;
 
-            return new ClassificationResult(category, merchant, amount, type, dateResult);
+            return new ClassificationResult(category, merchant, amount, type, dateResult, true);
 
         } catch (Exception e) {
             Log.e(TAG, "Failed to parse Gemini response", e);
