@@ -230,8 +230,47 @@ public class GmailFetcher {
                     }
                 }
 
-                Log.d(TAG, "After dedup: " + deduped.size() + " (was " + results.size() + ")");
-                callback.onResult(deduped);
+                // ── Cross-vendor dedup: amount + day + type ────────────────────
+                // Catches different senders notifying about the same transaction
+                // (e.g. bank alert + Interac notification, or merchant + payment gateway).
+                // When two entries share amount + day + type, keep the longer subject.
+                List<Transaction> crossDeduped = new ArrayList<>();
+                Set<String> seenCross = new HashSet<>();
+
+                for (Transaction t : deduped) {
+                    long dayBucket  = t.getDateMillis() / (24L * 60 * 60 * 1000);
+                    String amtKey   = String.format(Locale.US, "%.2f", t.getAmount());
+                    String typeKey  = t.getType().name();
+                    String key      = amtKey + "|" + dayBucket + "|" + typeKey;
+
+                    if (!seenCross.contains(key)) {
+                        seenCross.add(key);
+                        crossDeduped.add(t);
+                    } else {
+                        for (int di = 0; di < crossDeduped.size(); di++) {
+                            Transaction existing = crossDeduped.get(di);
+                            long existingDay  = existing.getDateMillis() / (24L * 60 * 60 * 1000);
+                            String existingAmt = String.format(Locale.US, "%.2f", existing.getAmount());
+                            String existingTypeKey = existing.getType().name();
+                            String existingKey = existingAmt + "|" + existingDay + "|" + existingTypeKey;
+
+                            if (existingKey.equals(key)) {
+                                int existingLen = existing.getSubject() != null ? existing.getSubject().length() : 0;
+                                int newLen      = t.getSubject()        != null ? t.getSubject().length()        : 0;
+                                if (newLen > existingLen) {
+                                    crossDeduped.set(di, t);
+                                    Log.d(TAG, "Cross-vendor dedup: replaced with longer subject for key=" + key);
+                                } else {
+                                    Log.d(TAG, "Cross-vendor dedup: dropped duplicate for key=" + key);
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                Log.d(TAG, "After dedup: " + deduped.size() + " → cross-vendor dedup: " + crossDeduped.size() + " (was " + results.size() + ")");
+                callback.onResult(crossDeduped);
 
             } catch (Exception e) {
                 Log.e(TAG, "Fetch failed", e);

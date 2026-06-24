@@ -1541,8 +1541,43 @@ public class HomeActivity extends AppCompatActivity {
                             }
                         }
                     }
+
+                    // Cross-vendor dedup: amount + day + type — catches different
+                    // senders notifying about the same underlying transaction
+                    // (e.g. bank alert + Interac notification).
+                    List<Transaction> crossDeduped = new ArrayList<>();
+                    Set<String> seenCross = new HashSet<>();
+                    for (Transaction t : deduped) {
+                        long dayBucket = t.getDateMillis() / (24L * 60 * 60 * 1000);
+                        String amtKey  = String.format(Locale.US, "%.2f", t.getAmount());
+                        String typeKey = t.getType().name();
+                        String key     = amtKey + "|" + dayBucket + "|" + typeKey;
+
+                        if (!seenCross.contains(key)) {
+                            seenCross.add(key);
+                            crossDeduped.add(t);
+                        } else {
+                            for (int di = 0; di < crossDeduped.size(); di++) {
+                                Transaction existing = crossDeduped.get(di);
+                                long existingDay  = existing.getDateMillis() / (24L * 60 * 60 * 1000);
+                                String existingAmt = String.format(Locale.US, "%.2f", existing.getAmount());
+                                String existingTypeKey = existing.getType().name();
+                                String existingKey = existingAmt + "|" + existingDay + "|" + existingTypeKey;
+
+                                if (existingKey.equals(key)) {
+                                    int existingLen = existing.getSubject() != null ? existing.getSubject().length() : 0;
+                                    int newLen      = t.getSubject()        != null ? t.getSubject().length()        : 0;
+                                    if (newLen > existingLen) {
+                                        crossDeduped.set(di, t);
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
                     List<Transaction> filtered = new ArrayList<>();
-                    for (Transaction tx : deduped) {
+                    for (Transaction tx : crossDeduped) {
                         if (tx.getMessageId() != null && !tx.getMessageId().startsWith("manual_")
                                 && excludedStore.isExcluded(tx.getMessageId())) {
                             continue;
@@ -1637,7 +1672,7 @@ public class HomeActivity extends AppCompatActivity {
             if (t.getType() == Transaction.Type.OUTGOING) totalOutgoing += t.getAmount();
             else totalIncoming += t.getAmount();
         }
-        double netCashFlow = totalOutgoing - totalIncoming;
+        double netCashFlow = totalIncoming - totalOutgoing;
 
         ((TextView) findViewById(R.id.tv_month_label)).setText(monthNames[currentMonth]);
         tvTotalAmount.setText(TransactionParser.formatAmount(netCashFlow));
@@ -1651,7 +1686,7 @@ public class HomeActivity extends AppCompatActivity {
         double prevNet = 0;
         for (Transaction t : transactions) {
             if (t.getDateMillis() >= prevMonthStart && t.getDateMillis() < monthStart) {
-                if (t.getType() == Transaction.Type.OUTGOING) prevNet += t.getAmount();
+                if (t.getType() == Transaction.Type.INCOMING) prevNet += t.getAmount();
                 else prevNet -= t.getAmount();
             }
         }
