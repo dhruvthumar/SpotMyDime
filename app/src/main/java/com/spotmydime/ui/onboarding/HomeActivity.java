@@ -49,6 +49,8 @@ import com.spotmydime.data.Transaction;
 import com.spotmydime.data.TransactionParser;
 import com.spotmydime.data.VendorStore;
 import com.spotmydime.data.ExcludedMessageStore;
+import com.spotmydime.data.PaycheckReminderStore;
+import com.spotmydime.data.PaycheckReminderStore.PaycheckReminder;
 import com.spotmydime.data.VendorAliasStore;
 import com.spotmydime.data.SubjectRuleStore;
 import com.spotmydime.data.TransactionOverrideStore;
@@ -96,6 +98,7 @@ public class HomeActivity extends AppCompatActivity {
     private LinearLayout containerSettingsAutoTracking;
     private LinearLayout containerSettingsMailScanning;
     private LinearLayout containerSettingsFeedback;
+    private LinearLayout containerSettingsPaycheckReminders;
     private SharedPreferences settingsPrefs;
     private final Map<String, Double> budgets = new HashMap<>();
     private final List<Map<String, String>> subscriptions = new ArrayList<>();
@@ -110,6 +113,8 @@ public class HomeActivity extends AppCompatActivity {
     private String selectedCategory = null;
     private Long startDateMillis = null;
     private Long endDateMillis = null;
+    private Transaction.Type selectedType = null;
+    private String sortMode = "date_desc";
     private boolean needsAuthRetry = false;
     private String searchQuery = "";
 
@@ -130,6 +135,7 @@ public class HomeActivity extends AppCompatActivity {
     private boolean isExpense = true;
     private long selectedDateMillis = System.currentTimeMillis();
     private ManualTransactionStore manualStore;
+    private PaycheckReminderStore paycheckReminderStore;
 
     private TextView tvInsightsNet;
     private TextView tvInsightsNetLabel;
@@ -231,6 +237,7 @@ public class HomeActivity extends AppCompatActivity {
         containerSettingsAutoTracking = findViewById(R.id.container_settings_auto_tracking);
         containerSettingsMailScanning = findViewById(R.id.container_settings_mail_scanning);
         containerSettingsFeedback = findViewById(R.id.container_settings_feedback);
+        containerSettingsPaycheckReminders = findViewById(R.id.container_settings_paycheck_reminders);
 
         tvInsightsNet = findViewById(R.id.tv_insights_net);
         tvInsightsNetLabel = findViewById(R.id.tv_insights_net_label);
@@ -278,6 +285,18 @@ public class HomeActivity extends AppCompatActivity {
         findViewById(R.id.btn_filter_all).setOnClickListener(v -> clearFilters());
         btnClear.setOnClickListener(v -> clearFilters());
 
+        // Type filter chips
+        findViewById(R.id.chip_filter_all).setOnClickListener(v -> setTypeFilter(null));
+        findViewById(R.id.chip_filter_income).setOnClickListener(v -> setTypeFilter(Transaction.Type.INCOMING));
+        findViewById(R.id.chip_filter_expense).setOnClickListener(v -> setTypeFilter(Transaction.Type.OUTGOING));
+
+        // Sort dropdown
+        findViewById(R.id.tv_sort_label).setOnClickListener(v -> showSortPicker());
+
+        // Initialize filter UI state
+        updateTypeChips();
+        updateSortLabel();
+
         etSearch = findViewById(R.id.et_search);
         etSearch.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -291,6 +310,7 @@ public class HomeActivity extends AppCompatActivity {
         excludedStore = new ExcludedMessageStore(this);
 
         manualStore = new ManualTransactionStore(this);
+        paycheckReminderStore = new PaycheckReminderStore(this);
 
         // Manual entry form
         containerAdd = findViewById(R.id.container_add);
@@ -323,6 +343,7 @@ public class HomeActivity extends AppCompatActivity {
         fetchAndShowTransactions();
         startPeriodicScan();
         initSettings();
+        checkPaycheckReminders();
     }
 
     @Override
@@ -333,6 +354,7 @@ public class HomeActivity extends AppCompatActivity {
             fetchAndShowTransactions();
         }
         startPeriodicScan();
+        checkPaycheckReminders();
     }
 
     @Override
@@ -349,7 +371,8 @@ public class HomeActivity extends AppCompatActivity {
             containerSettingsBudgetGoals.getVisibility() == View.VISIBLE ||
             containerSettingsCategories.getVisibility() == View.VISIBLE ||
             containerSettingsEditCategory.getVisibility() == View.VISIBLE ||
-            containerSettingsAutoTracking.getVisibility() == View.VISIBLE) {
+            containerSettingsAutoTracking.getVisibility() == View.VISIBLE ||
+            containerSettingsPaycheckReminders.getVisibility() == View.VISIBLE) {
             showSettingsScreen(containerSettingsMain);
             return;
         }
@@ -1850,9 +1873,6 @@ public class HomeActivity extends AppCompatActivity {
     private void renderTransactionList(List<Transaction> transactions) {
         containerTransactions.removeAllViews();
 
-        // Ensure transactions are sorted newest first
-        transactions.sort((a, b) -> Long.compare(b.getDateMillis(), a.getDateMillis()));
-
         String lastLabel = null;
         for (Transaction t : transactions) {
             Date d = new Date(t.getDateMillis());
@@ -2341,6 +2361,62 @@ public class HomeActivity extends AppCompatActivity {
 
     // ── FILTERING ──
 
+    private void setTypeFilter(Transaction.Type type) {
+        selectedType = type;
+        updateTypeChips();
+        filterAndRender();
+    }
+
+    private void updateTypeChips() {
+        TextView chipAll = findViewById(R.id.chip_filter_all);
+        TextView chipIncome = findViewById(R.id.chip_filter_income);
+        TextView chipExpense = findViewById(R.id.chip_filter_expense);
+
+        int activeBg = R.drawable.nav_bg_active;
+        int inactiveBg = R.drawable.bg_chip_outline;
+        int activeTextColor = 0xFFFFFFFF;
+        int incomeTextColor = 0xFF2B9348;
+        int expenseTextColor = 0xFFE53935;
+        int inactiveTextColor = 0xFF888888;
+
+        chipAll.setBackgroundResource(selectedType == null ? activeBg : inactiveBg);
+        chipAll.setTextColor(selectedType == null ? activeTextColor : inactiveTextColor);
+
+        chipIncome.setBackgroundResource(selectedType == Transaction.Type.INCOMING ? activeBg : inactiveBg);
+        chipIncome.setTextColor(selectedType == Transaction.Type.INCOMING ? activeTextColor : incomeTextColor);
+
+        chipExpense.setBackgroundResource(selectedType == Transaction.Type.OUTGOING ? activeBg : inactiveBg);
+        chipExpense.setTextColor(selectedType == Transaction.Type.OUTGOING ? activeTextColor : expenseTextColor);
+    }
+
+    private void showSortPicker() {
+        String[] options = {"Newest", "Oldest", "Highest Amount", "Lowest Amount"};
+        String[] values = {"date_desc", "date_asc", "amount_desc", "amount_asc"};
+        int checked = 0;
+        for (int i = 0; i < values.length; i++) {
+            if (values[i].equals(sortMode)) { checked = i; break; }
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Sort Transactions")
+                .setSingleChoiceItems(options, checked, (dialog, which) -> {
+                    sortMode = values[which];
+                    updateSortLabel();
+                    dialog.dismiss();
+                    filterAndRender();
+                })
+                .show();
+    }
+
+    private void updateSortLabel() {
+        TextView tvSort = findViewById(R.id.tv_sort_label);
+        switch (sortMode) {
+            case "amount_desc": tvSort.setText("Highest Amount"); break;
+            case "amount_asc": tvSort.setText("Lowest Amount"); break;
+            case "date_asc": tvSort.setText("Oldest"); break;
+            case "date_desc": default: tvSort.setText("Newest"); break;
+        }
+    }
+
     private void showCategoryPicker() {
         if (allTransactions == null) return;
 
@@ -2416,9 +2492,13 @@ public class HomeActivity extends AppCompatActivity {
         selectedCategory = null;
         startDateMillis = null;
         endDateMillis = null;
+        selectedType = null;
+        sortMode = "date_desc";
         tvDateRangeFilter.setVisibility(View.GONE);
         searchQuery = "";
         etSearch.setText("");
+        updateTypeChips();
+        updateSortLabel();
         Toast.makeText(this, "Filters cleared", Toast.LENGTH_SHORT).show();
         if (allTransactions != null) {
             populateDashboard(allTransactions);
@@ -2430,6 +2510,7 @@ public class HomeActivity extends AppCompatActivity {
 
         List<Transaction> filtered = allTransactions;
 
+        // Apply search filter
         if (!searchQuery.isEmpty()) {
             filtered = filtered.stream()
                     .filter(t ->
@@ -2442,12 +2523,14 @@ public class HomeActivity extends AppCompatActivity {
                     .collect(Collectors.toList());
         }
 
+        // Apply category filter
         if (selectedCategory != null) {
             filtered = filtered.stream()
                     .filter(t -> selectedCategory.equals(t.getCategory()))
                     .collect(Collectors.toList());
         }
 
+        // Apply date range filter
         if (startDateMillis != null) {
             filtered = filtered.stream()
                     .filter(t -> t.getDateMillis() >= startDateMillis)
@@ -2458,6 +2541,30 @@ public class HomeActivity extends AppCompatActivity {
             filtered = filtered.stream()
                     .filter(t -> t.getDateMillis() <= endDateMillis)
                     .collect(Collectors.toList());
+        }
+
+        // Apply type filter (All / Income / Expense)
+        if (selectedType != null) {
+            filtered = filtered.stream()
+                    .filter(t -> t.getType() == selectedType)
+                    .collect(Collectors.toList());
+        }
+
+        // Apply sort
+        switch (sortMode) {
+            case "amount_desc":
+                filtered.sort((a, b) -> Double.compare(b.getAmount(), a.getAmount()));
+                break;
+            case "amount_asc":
+                filtered.sort((a, b) -> Double.compare(a.getAmount(), b.getAmount()));
+                break;
+            case "date_asc":
+                filtered.sort((a, b) -> Long.compare(a.getDateMillis(), b.getDateMillis()));
+                break;
+            case "date_desc":
+            default:
+                filtered.sort((a, b) -> Long.compare(b.getDateMillis(), a.getDateMillis()));
+                break;
         }
 
         // Display date range if filtering by dates
@@ -2624,6 +2731,11 @@ public class HomeActivity extends AppCompatActivity {
 
         Toast.makeText(this, (isExpense ? "Expense" : "Income") + " saved", Toast.LENGTH_SHORT).show();
 
+        // If income was added, offer to set up a paycheck reminder
+        if (type == Transaction.Type.INCOMING) {
+            promptPaycheckReminder(displayMerchant, amount, selectedDateMillis, category, notes);
+        }
+
         // Clear form
         etCategory.setText("");
         etAmount.setText("");
@@ -2633,6 +2745,29 @@ public class HomeActivity extends AppCompatActivity {
 
         // Refresh data
         fetchAndShowTransactions();
+    }
+
+    private void promptPaycheckReminder(String merchant, double amount, long dateMillis,
+                                        String category, String notes) {
+        new AlertDialog.Builder(this)
+                .setTitle("Set Paycheck Reminder?")
+                .setMessage("Would you like to be reminded to add this paycheck again after 15 days or 1 month?")
+                .setPositiveButton("After 15 days", (dialog, which) -> {
+                    PaycheckReminder r = PaycheckReminder.create(
+                            merchant, amount, dateMillis, 15, category, notes
+                    );
+                    paycheckReminderStore.save(r);
+                    Toast.makeText(this, "Reminder set for 15 days", Toast.LENGTH_SHORT).show();
+                })
+                .setNeutralButton("After 1 month", (dialog, which) -> {
+                    PaycheckReminder r = PaycheckReminder.create(
+                            merchant, amount, dateMillis, 30, category, notes
+                    );
+                    paycheckReminderStore.save(r);
+                    Toast.makeText(this, "Reminder set for 1 month", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("No, thanks", null)
+                .show();
     }
 
     // ── SETTINGS ──
@@ -2730,6 +2865,10 @@ public class HomeActivity extends AppCompatActivity {
             loadSettingsBudgetGoals();
             showSettingsScreen(containerSettingsBudgetGoals);
         });
+        findViewById(R.id.btn_settings_paycheck_reminders).setOnClickListener(v -> {
+            loadPaycheckReminders();
+            showSettingsScreen(containerSettingsPaycheckReminders);
+        });
         findViewById(R.id.btn_settings_notifications).setOnClickListener(v -> {
             Toast.makeText(this, "Notifications - coming soon", Toast.LENGTH_SHORT).show();
         });
@@ -2795,6 +2934,7 @@ public class HomeActivity extends AppCompatActivity {
         findViewById(R.id.btn_auto_tracking_back).setOnClickListener(v -> showSettingsScreen(containerSettingsMain));
         findViewById(R.id.btn_mail_scanning_back).setOnClickListener(v -> showSettingsScreen(containerSettingsMain));
         findViewById(R.id.btn_feedback_back).setOnClickListener(v -> showSettingsScreen(containerSettingsMain));
+        findViewById(R.id.btn_paycheck_reminders_back).setOnClickListener(v -> showSettingsScreen(containerSettingsMain));
     }
 
     private void showSettingsScreen(LinearLayout target) {
@@ -2807,6 +2947,7 @@ public class HomeActivity extends AppCompatActivity {
         containerSettingsAutoTracking.setVisibility(target == containerSettingsAutoTracking ? View.VISIBLE : View.GONE);
         containerSettingsMailScanning.setVisibility(target == containerSettingsMailScanning ? View.VISIBLE : View.GONE);
         containerSettingsFeedback.setVisibility(target == containerSettingsFeedback ? View.VISIBLE : View.GONE);
+        containerSettingsPaycheckReminders.setVisibility(target == containerSettingsPaycheckReminders ? View.VISIBLE : View.GONE);
     }
 
     private void showSupportDialog(String title, String message) {
@@ -4531,6 +4672,177 @@ public class HomeActivity extends AppCompatActivity {
                     Toast.makeText(this, "Keyword added", Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    // PAYCHECK REMINDERS
+    // ════════════════════════════════════════════════════════════════
+
+    private void loadPaycheckReminders() {
+        LinearLayout list = findViewById(R.id.container_paycheck_reminders_list);
+        list.removeAllViews();
+
+        List<PaycheckReminder> reminders = paycheckReminderStore.getAll();
+
+        if (reminders.isEmpty()) {
+            TextView empty = new TextView(this);
+            empty.setText("No paycheck reminders set.\nAdd an income transaction\nto create one.");
+            empty.setTextColor(0xFF888888);
+            empty.setTextSize(14);
+            empty.setGravity(android.view.Gravity.CENTER);
+            empty.setPadding(0, dp(24), 0, dp(24));
+            list.addView(empty);
+            return;
+        }
+
+        CardView container = createCardContainer();
+        LinearLayout inner = createCardInner();
+        SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.US);
+
+        for (int i = 0; i < reminders.size(); i++) {
+            final PaycheckReminder r = reminders.get(i);
+
+            LinearLayout row = createCardRow();
+
+            LinearLayout textCol = new LinearLayout(this);
+            textCol.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            textCol.setOrientation(LinearLayout.VERTICAL);
+
+            TextView tvMerchant = new TextView(this);
+            tvMerchant.setText(r.merchant);
+            tvMerchant.setTextSize(15);
+            tvMerchant.setTextColor(0xFF000000);
+            tvMerchant.setTypeface(null, android.graphics.Typeface.BOLD);
+            textCol.addView(tvMerchant);
+
+            String nextDateStr = sdf.format(new Date(r.nextReminderDateMillis));
+            String intervalLabel = r.intervalDays == 15 ? "15 days" : "1 month";
+            String amtStr = r.amount > 0 ? "$" + String.format("%.2f", r.amount) : "Amount not set";
+            TextView tvDetail = new TextView(this);
+            tvDetail.setText(amtStr + " · Every " + intervalLabel + " · Next: " + nextDateStr);
+            tvDetail.setTextSize(12);
+            tvDetail.setTextColor(0xFF888888);
+            textCol.addView(tvDetail);
+
+            row.addView(textCol);
+
+            TextView btnDelete = new TextView(this);
+            btnDelete.setText("Delete");
+            btnDelete.setTextSize(13);
+            btnDelete.setTextColor(0xFFE53935);
+            btnDelete.setTypeface(null, android.graphics.Typeface.BOLD);
+            btnDelete.setPadding(dp(12), dp(8), dp(12), dp(8));
+            btnDelete.setClickable(true);
+            btnDelete.setFocusable(true);
+            btnDelete.setOnClickListener(v -> {
+                new AlertDialog.Builder(this)
+                        .setTitle("Delete Reminder")
+                        .setMessage("Remove paycheck reminder for \"" + r.merchant + "\"?")
+                        .setPositiveButton("Delete", (dialog, which) -> {
+                            paycheckReminderStore.delete(r.id);
+                            loadPaycheckReminders();
+                            Toast.makeText(this, "Reminder removed", Toast.LENGTH_SHORT).show();
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+            });
+            row.addView(btnDelete);
+
+            inner.addView(row);
+            if (i < reminders.size() - 1) {
+                addDivider(inner);
+            }
+        }
+
+        container.addView(inner);
+        list.addView(container);
+    }
+
+    private void checkPaycheckReminders() {
+        List<PaycheckReminder> due = paycheckReminderStore.getDueReminders();
+        for (final PaycheckReminder r : due) {
+            showPaycheckDueDialog(r);
+        }
+    }
+
+    private void showPaycheckDueDialog(final PaycheckReminder r) {
+        String intervalLabel = r.intervalDays == 15 ? "15 days" : "1 month";
+        String expectedAmt = r.amount > 0 ? "$" + String.format("%.2f", r.amount) : "your paycheck amount";
+
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(dp(24), dp(16), dp(24), dp(16));
+
+        TextView tvInfo = new TextView(this);
+        tvInfo.setText("Your " + r.merchant + " (" + expectedAmt + ") is expected today!\n\n"
+                + "Enter the amount received to sync it, or mark as received to schedule the next reminder.");
+        tvInfo.setTextSize(14);
+        tvInfo.setTextColor(0xFF333333);
+        tvInfo.setLineSpacing(dp(4), 1);
+        layout.addView(tvInfo);
+
+        final EditText etAmt = new EditText(this);
+        etAmt.setHint("Amount received ($)");
+        if (r.amount > 0) etAmt.setText(String.valueOf(r.amount));
+        etAmt.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        etAmt.setBackgroundResource(R.drawable.input_outline);
+        etAmt.setPadding(dp(16), dp(12), dp(16), dp(12));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(12);
+        etAmt.setLayoutParams(lp);
+        layout.addView(etAmt);
+
+        new AlertDialog.Builder(this)
+                .setTitle("Paycheck Due Reminder")
+                .setView(layout)
+                .setPositiveButton("Save & Next", (dialog, which) -> {
+                    String amtStr = etAmt.getText().toString().trim();
+                    double amt;
+                    if (amtStr.isEmpty()) {
+                        Toast.makeText(this, "Please enter an amount or skip", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    try {
+                        amt = Double.parseDouble(amtStr);
+                    } catch (Exception e) {
+                        Toast.makeText(this, "Invalid amount", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    // Save as manual transaction
+                    String dateDisplay = dateFormat.format(new Date());
+                    Transaction t = ManualTransactionStore.createTransaction(
+                            r.merchant, amt, System.currentTimeMillis(), dateDisplay,
+                            r.category, Transaction.Type.INCOMING, r.notes
+                    );
+                    manualStore.save(t);
+
+                    // Update reminder next date
+                    java.util.Calendar cal = java.util.Calendar.getInstance();
+                    cal.setTimeInMillis(System.currentTimeMillis());
+                    cal.add(java.util.Calendar.DAY_OF_YEAR, r.intervalDays);
+                    r.nextReminderDateMillis = cal.getTimeInMillis();
+                    r.amount = amt;
+                    paycheckReminderStore.update(r);
+
+                    Toast.makeText(this, "Paycheck saved! Next reminder in " + intervalLabel, Toast.LENGTH_SHORT).show();
+                    fetchAndShowTransactions();
+                })
+                .setNeutralButton("Skip / Later", (dialog, which) -> {
+                    // Reschedule to tomorrow
+                    java.util.Calendar cal = java.util.Calendar.getInstance();
+                    cal.setTimeInMillis(System.currentTimeMillis());
+                    cal.add(java.util.Calendar.DAY_OF_YEAR, 1);
+                    r.nextReminderDateMillis = cal.getTimeInMillis();
+                    paycheckReminderStore.update(r);
+                    Toast.makeText(this, "Reminder snoozed to tomorrow", Toast.LENGTH_SHORT).show();
+                })
+                .setNegativeButton("Remove Reminder", (dialog, which) -> {
+                    paycheckReminderStore.delete(r.id);
+                    Toast.makeText(this, "Reminder removed", Toast.LENGTH_SHORT).show();
+                })
                 .show();
     }
 

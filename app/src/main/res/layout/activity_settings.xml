@@ -376,6 +376,34 @@
 
                         <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F0E8D5" android:layout_marginHorizontal="16dp" />
 
+                        <!-- Paycheck Reminders -->
+                        <LinearLayout
+                                android:id="@+id/btn_settings_paycheck_reminders"
+                                android:layout_width="match_parent"
+                                android:layout_height="56dp"
+                                android:orientation="horizontal"
+                                android:gravity="center_vertical"
+                                android:paddingHorizontal="16dp"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:foreground="?attr/selectableItemBackground">
+                            <TextView
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_weight="1"
+                                    android:text="Paycheck Reminders"
+                                    android:textColor="#000000"
+                                    android:textSize="16sp" />
+                            <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="›"
+                                    android:textColor="#D4A373"
+                                    android:textSize="20sp" />
+                        </LinearLayout>
+
+                        <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F0E8D5" android:layout_marginHorizontal="16dp" />
+
                         <!-- Notifications -->
                         <LinearLayout
                                 android:id="@+id/btn_settings_notifications"
@@ -1648,6 +1676,63 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:foreground="?attr/selectableItemBackground" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ════════════════════════════════════════════════════════ -->
+    <!-- SCREEN 10: PAYCHECK REMINDERS                           -->
+    <!-- ════════════════════════════════════════════════════════ -->
+    <LinearLayout
+            android:id="@+id/container_settings_paycheck_reminders"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+        <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:paddingHorizontal="20dp"
+                android:layout_marginTop="16dp">
+            <ImageView
+                    android:id="@+id/btn_paycheck_reminders_back"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:src="@android:drawable/ic_media_previous"
+                    android:padding="8dp"
+                    android:layout_centerVertical="true"
+                    android:layout_alignParentStart="true"
+                    android:contentDescription="Back" />
+            <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Paycheck Reminders"
+                    android:textColor="#000000"
+                    android:textSize="22sp"
+                    android:textStyle="bold"
+                    android:layout_centerInParent="true" />
+        </RelativeLayout>
+
+        <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingHorizontal="20dp"
+                android:layout_marginTop="12dp">
+
+            <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Set reminders for recurring income (e.g. paycheck). You will be prompted to enter the amount on the expected date."
+                    android:textColor="#888888"
+                    android:textSize="13sp"
+                    android:layout_marginBottom="16dp" />
+
+            <LinearLayout
+                    android:id="@+id/container_paycheck_reminders_list"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
         </LinearLayout>
     </LinearLayout>
 

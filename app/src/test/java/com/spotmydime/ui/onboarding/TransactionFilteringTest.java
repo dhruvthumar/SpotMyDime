@@ -208,6 +208,107 @@ public class TransactionFilteringTest {
         assertEquals("Should return 0 Transportation transactions from today", 0, transportToday.size());
     }
 
+    /**
+     * Test Case 4: Filter transactions by type (income vs expense)
+     * Verifies that filtering by transaction type returns only matching transactions.
+     */
+    @Test
+    public void testFilterByType() {
+        // Test 1: Filter by income only
+        List<Transaction> income = filterByType(testTransactions, Transaction.Type.INCOMING);
+        assertEquals("Should return 1 income transaction", 1, income.size());
+        assertTrue("All should be income",
+            income.stream().allMatch(t -> t.getType() == Transaction.Type.INCOMING));
+        assertEquals("Should be Freelance Client", "Freelance Client", income.get(0).getMerchant());
+
+        // Test 2: Filter by expense only
+        List<Transaction> expenses = filterByType(testTransactions, Transaction.Type.OUTGOING);
+        assertEquals("Should return 6 expense transactions", 6, expenses.size());
+        assertTrue("All should be expense",
+            expenses.stream().allMatch(t -> t.getType() == Transaction.Type.OUTGOING));
+
+        // Test 3: Null type returns all
+        List<Transaction> all = filterByType(testTransactions, null);
+        assertEquals("Null type should return all transactions", 7, all.size());
+    }
+
+    /**
+     * Test Case 5: Sort transactions by amount descending
+     * Verifies transactions are sorted from largest to smallest amount.
+     */
+    @Test
+    public void testSortByAmountDescending() {
+        List<Transaction> sorted = sortByAmount(testTransactions, false);
+        assertEquals("Should still have 7 transactions", 7, sorted.size());
+        for (int i = 1; i < sorted.size(); i++) {
+            assertTrue("Transaction " + i + " should be <= previous amount",
+                sorted.get(i).getAmount() <= sorted.get(i - 1).getAmount());
+        }
+        assertEquals("First should be Freelance Client ($500)", "Freelance Client", sorted.get(0).getMerchant());
+        assertEquals("Last should be Starbucks ($5.50)", "Starbucks", sorted.get(sorted.size() - 1).getMerchant());
+    }
+
+    /**
+     * Test Case 6: Sort transactions by amount ascending
+     * Verifies transactions are sorted from smallest to largest amount.
+     */
+    @Test
+    public void testSortByAmountAscending() {
+        List<Transaction> sorted = sortByAmount(testTransactions, true);
+        assertEquals("Should still have 7 transactions", 7, sorted.size());
+        for (int i = 1; i < sorted.size(); i++) {
+            assertTrue("Transaction " + i + " should be >= previous amount",
+                sorted.get(i).getAmount() >= sorted.get(i - 1).getAmount());
+        }
+        assertEquals("First should be Starbucks ($5.50)", "Starbucks", sorted.get(0).getMerchant());
+        assertEquals("Last should be Freelance Client ($500)", "Freelance Client", sorted.get(sorted.size() - 1).getMerchant());
+    }
+
+    /**
+     * Test Case 7: Combined type and category filter
+     * Verifies that type + category filters work together correctly.
+     */
+    @Test
+    public void testCombinedTypeAndCategoryFilters() {
+        // Filter by Shopping category first
+        List<Transaction> shopping = filterByCategory(testTransactions, "Shopping");
+        // Then filter by expense type
+        List<Transaction> result = filterByType(shopping, Transaction.Type.OUTGOING);
+
+        assertEquals("Should return 2 Shopping expense transactions", 2, result.size());
+        assertTrue("All should be Shopping category",
+            result.stream().allMatch(t -> "Shopping".equals(t.getCategory())));
+        assertTrue("All should be expense",
+            result.stream().allMatch(t -> t.getType() == Transaction.Type.OUTGOING));
+    }
+
+    /**
+     * Test Case 8: Combined type filter, category filter, and sort by amount
+     * Verifies all three work together (multi-filter system).
+     */
+    @Test
+    public void testMultiFilterSystem() {
+        // Start with all transactions
+        List<Transaction> result = testTransactions;
+
+        // Filter by expense type
+        result = filterByType(result, Transaction.Type.OUTGOING);
+
+        // Filter by Food & Dining category
+        result = filterByCategory(result, "Food & Dining");
+
+        // Sort by amount descending
+        result = sortByAmount(result, false);
+
+        assertEquals("Should return 2 Food & Dining expense transactions", 2, result.size());
+        assertEquals("First should be Tim Hortons ($8.99)", "Tim Hortons", result.get(0).getMerchant());
+        assertEquals("Second should be Starbucks ($5.50)", "Starbucks", result.get(1).getMerchant());
+        assertTrue("All should be expense",
+            result.stream().allMatch(t -> t.getType() == Transaction.Type.OUTGOING));
+        assertTrue("All should be Food & Dining",
+            result.stream().allMatch(t -> "Food & Dining".equals(t.getCategory())));
+    }
+
     // ── HELPER METHODS ──
 
     /**
@@ -229,6 +330,32 @@ public class TransactionFilteringTest {
         return transactions.stream()
             .filter(t -> t.getDateMillis() >= startMillis && t.getDateMillis() <= endMillis)
             .collect(Collectors.toList());
+    }
+
+    /**
+     * Filters transactions by type (INCOMING, OUTGOING, or null for all)
+     */
+    private List<Transaction> filterByType(List<Transaction> transactions, Transaction.Type type) {
+        if (type == null) {
+            return transactions;
+        }
+        return transactions.stream()
+            .filter(t -> t.getType() == type)
+            .collect(Collectors.toList());
+    }
+
+    /**
+     * Sorts transactions by amount
+     * @param ascending true for ascending, false for descending
+     */
+    private List<Transaction> sortByAmount(List<Transaction> transactions, boolean ascending) {
+        List<Transaction> sorted = new ArrayList<>(transactions);
+        if (ascending) {
+            sorted.sort((a, b) -> Double.compare(a.getAmount(), b.getAmount()));
+        } else {
+            sorted.sort((a, b) -> Double.compare(b.getAmount(), a.getAmount()));
+        }
+        return sorted;
     }
 }
 
