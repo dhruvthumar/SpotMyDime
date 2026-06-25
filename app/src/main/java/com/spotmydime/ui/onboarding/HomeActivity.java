@@ -108,6 +108,7 @@ public class HomeActivity extends AppCompatActivity {
     private TextView tvTrend;
     private TextView btnClear;
     private TextView tvDateRangeFilter;
+    private TextView tvFilteredTotal;
 
     private List<Transaction> allTransactions;
     private String selectedCategory = null;
@@ -279,6 +280,7 @@ public class HomeActivity extends AppCompatActivity {
         tvTrend = findViewById(R.id.tv_trend);
         btnClear = findViewById(R.id.tv_clear);
         tvDateRangeFilter = findViewById(R.id.tv_date_range_filter);
+        tvFilteredTotal = findViewById(R.id.tv_filtered_total);
 
         findViewById(R.id.btn_filter_category).setOnClickListener(v -> showCategoryPicker());
         findViewById(R.id.btn_filter_date).setOnClickListener(v -> showDateRangePicker());
@@ -1745,31 +1747,10 @@ public class HomeActivity extends AppCompatActivity {
             }
         }
 
-        // Sort categories by amount descending, take top 5
+        // Sort categories by amount descending, take top 5 (only real data, no $0 padding)
         List<Map.Entry<String, Double>> sortedCats = new ArrayList<>(categoryExpenses.entrySet());
         sortedCats.sort((a, b) -> Double.compare(b.getValue(), a.getValue()));
-
-        // Ensure at least 5 categories (pad with unused def categories at $0 if needed)
-        List<Map.Entry<String, Double>> top5 = new ArrayList<>(sortedCats);
-        if (top5.size() < 5) {
-            List<Map<String, Object>> defs = loadCategoryDefs();
-            Set<String> usedCats = new HashSet<>();
-            for (Map.Entry<String, Double> e : top5) usedCats.add(e.getKey());
-            for (Map<String, Object> d : defs) {
-                if (top5.size() >= 5) break;
-                String name = (String) d.get("name");
-                if (!usedCats.contains(name)) {
-                    final String catName = name;
-                    usedCats.add(catName);
-                    top5.add(new Map.Entry<String, Double>() {
-                        @Override public String getKey() { return catName; }
-                        @Override public Double getValue() { return 0.0; }
-                        @Override public Double setValue(Double v) { return null; }
-                    });
-                }
-            }
-        }
-        top5 = top5.subList(0, Math.min(5, top5.size()));
+        List<Map.Entry<String, Double>> top5 = sortedCats.subList(0, Math.min(5, sortedCats.size()));
 
         double maxCat = 0;
         for (Map.Entry<String, Double> e : top5) {
@@ -2576,6 +2557,23 @@ public class HomeActivity extends AppCompatActivity {
         } else {
             tvDateRangeFilter.setVisibility(View.GONE);
         }
+
+        // Display filtered total
+        double total = 0;
+        for (Transaction t : filtered) {
+            if (t.getType() == Transaction.Type.INCOMING) total += t.getAmount();
+            else total -= t.getAmount();
+        }
+        String sign = total >= 0 ? "+" : "";
+        tvFilteredTotal.setText(sign + TransactionParser.formatAmount(total));
+        if (selectedType == Transaction.Type.INCOMING) {
+            tvFilteredTotal.setTextColor(0xFF2B9348);
+        } else if (selectedType == Transaction.Type.OUTGOING) {
+            tvFilteredTotal.setTextColor(0xFFE53935);
+        } else {
+            tvFilteredTotal.setTextColor(total >= 0 ? 0xFF2B9348 : 0xFFE53935);
+        }
+        tvFilteredTotal.setVisibility(View.VISIBLE);
 
         if (filtered.isEmpty()) {
             containerTransactions.removeAllViews();
