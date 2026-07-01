@@ -12,3 +12,5 @@
 local.properties
 *.keystore
 google-services.json
+backend/node_modules/
+backend/.env

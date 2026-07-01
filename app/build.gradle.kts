@@ -26,7 +26,7 @@ android {
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        buildConfigField("String", "GEMINI_API_KEY", "\"${getLocalProperty("gemini.api.key") ?: ""}\"")
+        buildConfigField("String", "BACKEND_URL", "\"${getLocalProperty("backend.url") ?: "http://10.0.2.2:3000"}\"")
     }
 
     buildFeatures {

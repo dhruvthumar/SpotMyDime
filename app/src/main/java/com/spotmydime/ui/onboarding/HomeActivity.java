@@ -205,8 +205,16 @@ public class HomeActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
 
-        // Initialize the Gemini AI API key from BuildConfig (read from local.properties)
-        GeminiClassifier.apiKey = BuildConfig.GEMINI_API_KEY;
+        // Point GeminiClassifier at the backend proxy and authenticate
+        GeminiClassifier.backendUrl = BuildConfig.BACKEND_URL;
+        String idToken = getIntent().getStringExtra("id_token");
+        if (idToken == null || idToken.isEmpty()) {
+            // Fallback: try to get a fresh token from the signed-in account
+            com.google.android.gms.auth.api.signin.GoogleSignInAccount account =
+                    com.google.android.gms.auth.api.signin.GoogleSignIn.getLastSignedInAccount(this);
+            if (account != null) idToken = account.getIdToken();
+        }
+        if (idToken != null) GeminiClassifier.idToken = idToken;
 
         String userName = getIntent().getStringExtra("user_name");
         String userEmail = getIntent().getStringExtra("user_email");

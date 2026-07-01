@@ -12,27 +12,21 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 
 /**
- * Calls the Gemini API to classify a transaction email.
+ * Calls the backend proxy to classify a transaction email via Gemini.
  *
- * Input:  sender display name, subject line, snippet, full body
- * Output: ClassificationResult with category, merchant nickname,
- *         amount, transaction type (incoming/outgoing), and optional date.
- *
- * Vendor memory lives in VendorStore (GmailFetcher layer) — this class
- * is stateless and only makes the API call + parses the response.
+ * The Gemini API key lives on the server — the app never sees it.
+ * Requests are authenticated with a Google ID token (Bearer auth).
  */
 public class GeminiClassifier {
 
     private static final String TAG = "GeminiClassifier";
-    private static final String MODEL = "gemini-2.5-flash";
-    private static final String API_URL =
-            "https://generativelanguage.googleapis.com/v1beta/models/" + MODEL + ":generateContent";
 
-    /** Set from HomeActivity.onCreate via BuildConfig or strings.xml. */
-    public static String apiKey = "";
+    /** Set from HomeActivity.onCreate via BuildConfig. */
+    public static String backendUrl = "";
+    public static String idToken = "";
 
     /** Minimum ms between API calls to avoid hitting rate limits. */
-    private static final long MIN_INTERVAL_MS = 1200; // ~50 RPM
+    private static final long MIN_INTERVAL_MS = 1200;
     private static long lastCallTime = 0;
 
     private static void throttle() {
@@ -46,25 +40,18 @@ public class GeminiClassifier {
 
     // ── Public API ────────────────────────────────────────────────────────────
 
-    /** Convenience: returns only category string. */
     public static String classify(String sender, String subject, String snippet) {
         ClassificationResult r = classifyFull(sender, subject, snippet, null);
         return r == null ? null : r.category;
     }
 
-    /**
-     * Full classification. Uses subject line as primary signal; body provides
-     * amount and date confirmation. Returns null on network/parse failure —
-     * caller should fall back to local heuristics.
-     */
     public static ClassificationResult classifyFull(String sender, String subject,
                                                      String snippet, String fullBody) {
-        if (apiKey == null || apiKey.isEmpty()) {
-            Log.w(TAG, "No API key — Gemini disabled");
+        if (backendUrl.isEmpty() || idToken.isEmpty()) {
+            Log.w(TAG, "Backend URL or ID token not set");
             return null;
         }
 
-        // Truncate body to keep token cost low (~750 words)
         String body = fullBody != null
                 ? fullBody.substring(0, Math.min(fullBody.length(), 2000))
                 : "";
@@ -74,17 +61,17 @@ public class GeminiClassifier {
         try {
             throttle();
             String requestJson = buildRequest(prompt);
-            String responseJson = postJson(API_URL, requestJson);
+            String responseJson = postToBackend(requestJson);
 
             if (responseJson == null) {
-                Log.w(TAG, "Gemini null response");
+                Log.w(TAG, "Backend returned null");
                 return null;
             }
 
             return parseResponse(responseJson);
 
         } catch (Exception e) {
-            Log.e(TAG, "Gemini call failed", e);
+            Log.e(TAG, "Classification failed", e);
             return null;
         }
     }
@@ -210,18 +197,13 @@ public class GeminiClassifier {
         return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", " ").replace("\r", "");
     }
 
-    /**
-     * Generic text generation. Sends an arbitrary prompt and returns the plain-text response.
-     * Returns null on any failure.
-     */
     public static String generateText(String prompt) {
-        if (apiKey == null || apiKey.isEmpty()) return null;
+        if (backendUrl.isEmpty() || idToken.isEmpty()) return null;
         try {
             throttle();
             String requestJson = buildRequest(prompt);
-            String responseJson = postJson(API_URL, requestJson);
+            String responseJson = postToBackend(requestJson);
             if (responseJson == null) return null;
-            // Extract text from response
             JSONObject root = new JSONObject(responseJson);
             JSONArray candidates = root.optJSONArray("candidates");
             if (candidates != null && candidates.length() > 0) {
@@ -235,7 +217,7 @@ public class GeminiClassifier {
             }
             return null;
         } catch (Exception e) {
-            Log.e(TAG, "Gemini generateText failed", e);
+            Log.e(TAG, "generateText failed", e);
             return null;
         }
     }
@@ -255,7 +237,6 @@ public class GeminiClassifier {
         JSONArray contents = new JSONArray();
         contents.put(content);
 
-        // Ask Gemini for deterministic, structured output
         JSONObject genConfig = new JSONObject();
         genConfig.put("temperature", 0.1);
         genConfig.put("topP", 0.9);
@@ -267,13 +248,15 @@ public class GeminiClassifier {
         return body.toString();
     }
 
-    private static String postJson(String urlStr, String json) throws Exception {
+    private static String postToBackend(String json) throws Exception {
+        String url = backendUrl + "/api/gemini/classify";
         int maxRetries = 3;
+
         for (int attempt = 0; attempt < maxRetries; attempt++) {
-            HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
+            HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-            conn.setRequestProperty("X-Goog-Api-Key", apiKey);
+            conn.setRequestProperty("Authorization", "Bearer " + idToken);
             conn.setConnectTimeout(20000);
             conn.setReadTimeout(20000);
             conn.setDoOutput(true);
@@ -283,7 +266,7 @@ public class GeminiClassifier {
             }
 
             int code = conn.getResponseCode();
-            Log.d(TAG, "HTTP " + code + " (attempt " + (attempt + 1) + "/" + maxRetries + ")");
+            Log.d(TAG, "Backend HTTP " + code + " (attempt " + (attempt + 1) + "/" + maxRetries + ")");
 
             BufferedReader reader = new BufferedReader(new InputStreamReader(
                     code >= 400 ? conn.getErrorStream() : conn.getInputStream(), "UTF-8"));
@@ -300,7 +283,7 @@ public class GeminiClassifier {
             }
 
             if (code >= 400) {
-                Log.w(TAG, "Gemini HTTP " + code);
+                Log.w(TAG, "Backend HTTP " + code);
                 return null;
             }
             return sb.toString();
@@ -310,7 +293,6 @@ public class GeminiClassifier {
 
     private static ClassificationResult parseResponse(String response) {
         try {
-            // Extract model text from candidates array
             String text = null;
             try {
                 JSONObject root = new JSONObject(response);
@@ -328,10 +310,8 @@ public class GeminiClassifier {
 
             if (text == null) text = response;
 
-            // Strip markdown code fences if model wraps in ```json ... ```
             text = text.replaceAll("(?s)```json\\s*", "").replaceAll("(?s)```\\s*", "").trim();
 
-            // Extract first JSON object from the text
             int start = text.indexOf('{');
             int end   = text.lastIndexOf('}');
             if (start < 0 || end <= start) {
@@ -348,23 +328,11 @@ public class GeminiClassifier {
             String amountStr     = out.optString("amount", "");
             String type          = out.optString("type", "outgoing");
             String date          = out.optString("date", "");
-            // merchant_confidence is read for logging/future use but doesn't
-            // gate anything here directly — the is_suspicious criteria in the
-            // prompt already account for "no identifiable merchant" cases that
-            // genuinely warrant suspicion vs. those that don't.
-            String merchantConfidence = out.optString("merchant_confidence", "low");
 
-            // If model says not a transaction, return a result that clearly
-            // signals that — caller (GmailFetcher) checks isTransaction and
-            // discards the email instead of creating a Transaction for it.
-            // isSuspicious is still propagated even here, since GmailFetcher
-            // logs/handles suspicious-and-not-a-transaction the same as
-            // suspicious-and-is-a-transaction: discard either way.
             if (!isTxn) {
                 return new ClassificationResult("Other", merchant, null, "outgoing", null, false, isSuspicious);
             }
 
-            // Parse amount
             Double amount = null;
             if (!amountStr.isEmpty()) {
                 try {
