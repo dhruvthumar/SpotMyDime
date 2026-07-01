@@ -1371,8 +1371,8 @@ public class HomeActivity extends AppCompatActivity {
             return;
         }
 
-        if (GeminiClassifier.apiKey == null || GeminiClassifier.apiKey.isEmpty()) {
-            Toast.makeText(this, "Set Gemini API key in strings.xml first", Toast.LENGTH_SHORT).show();
+        if (GeminiClassifier.backendUrl == null || GeminiClassifier.backendUrl.isEmpty()) {
+            Toast.makeText(this, "Backend URL not configured", Toast.LENGTH_SHORT).show();
             return;
         }
 

@@ -617,7 +617,7 @@ public class GmailFetcher {
         char avatar = from.isEmpty() ? '?' : Character.toUpperCase(from.trim().charAt(0));
 
         Log.d(TAG, "RESULT | merchant=" + merchant + " | category=" + category
-                + " | amount=" + (amount != null ? String.format(Locale.US, "%.2f", amount) : "null") + " | type=" + type);
+                + " | amount=" + String.format(Locale.US, "%.2f", amount) + " | type=" + type);
 
         return new Transaction(merchant, amount, finalDateMillis, dateDisplay, category,
                 avatar, type, extractEmailFromHeader(from), subject, messageId, rawVendor);

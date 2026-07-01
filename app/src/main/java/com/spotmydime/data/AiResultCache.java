@@ -57,10 +57,6 @@ public class AiResultCache {
         prefs.edit().remove(messageId).apply();
     }
 
-    public void clear() {
-        prefs.edit().clear().apply();
-    }
-
     public static class CachedResult {
         public final String merchant;
         public final String category;
