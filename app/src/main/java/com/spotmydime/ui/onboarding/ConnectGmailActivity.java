@@ -64,7 +64,7 @@ public class ConnectGmailActivity extends AppCompatActivity {
 
             String email = account.getEmail();
             String name = account.getDisplayName();
-            Log.d(TAG, "OAuth success: " + email);
+            Log.d(TAG, "OAuth success");
 
             // Navigate to dashboard, pass name + email so HomeActivity can show them
             // Intent.FLAG_ACTIVITY_NEW_TASK | CLEAR_TASK means the user can't

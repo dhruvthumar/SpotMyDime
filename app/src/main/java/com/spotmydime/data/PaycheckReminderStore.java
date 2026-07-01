@@ -3,6 +3,8 @@ package com.spotmydime.data;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import com.spotmydime.util.SecurePrefs;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -18,7 +20,11 @@ public class PaycheckReminderStore {
     private final SharedPreferences prefs;
 
     public PaycheckReminderStore(Context context) {
-        prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        prefs = SecurePrefs.get(context, PREFS_NAME);
+    }
+
+    public void clear() {
+        prefs.edit().clear().apply();
     }
 
     public void save(PaycheckReminder r) {

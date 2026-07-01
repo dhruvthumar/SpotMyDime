@@ -3,6 +3,8 @@ package com.spotmydime.data;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import com.spotmydime.util.SecurePrefs;
+
 import org.json.JSONObject;
 import org.json.JSONTokener;
 
@@ -41,7 +43,11 @@ public class SubjectRuleStore {
     private final SharedPreferences prefs;
 
     public SubjectRuleStore(Context context) {
-        prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        prefs = SecurePrefs.get(context, PREFS_NAME);
+    }
+
+    public void clear() {
+        prefs.edit().clear().apply();
     }
 
     public static List<String> extractKeywords(String subject) {

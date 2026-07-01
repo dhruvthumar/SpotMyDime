@@ -225,7 +225,7 @@ public class HomeActivity extends AppCompatActivity {
         containerIncome = findViewById(R.id.container_income);
         containerTrends = findViewById(R.id.container_trends);
         containerSettings = findViewById(R.id.container_settings);
-        settingsPrefs = getSharedPreferences("settings_prefs", Context.MODE_PRIVATE);
+        settingsPrefs = com.spotmydime.util.SecurePrefs.get(this, "settings_prefs");
         vendorStore = new VendorStore(this);
         aliasStore = new VendorAliasStore(this);
 
@@ -2784,14 +2784,16 @@ public class HomeActivity extends AppCompatActivity {
     }
 
     private void clearAppData() {
-        getSharedPreferences("settings_prefs", Context.MODE_PRIVATE).edit().clear().apply();
-        getSharedPreferences("excluded_messages", Context.MODE_PRIVATE).edit().clear().apply();
-        getSharedPreferences("vendor_categories", Context.MODE_PRIVATE).edit().clear().apply();
-        getSharedPreferences("vendor_aliases", Context.MODE_PRIVATE).edit().clear().apply();
-        getSharedPreferences("tx_overrides", Context.MODE_PRIVATE).edit().clear().apply();
-        getSharedPreferences("ai_result_cache", Context.MODE_PRIVATE).edit().clear().apply();
-        getSharedPreferences("manual_transactions", Context.MODE_PRIVATE).edit().clear().apply();
-        getSharedPreferences("sync_state", Context.MODE_PRIVATE).edit().clear().apply();
+        settingsPrefs.edit().clear().apply();
+        excludedStore.clear();
+        vendorStore.clear();
+        aliasStore.clear();
+        manualStore.clear();
+        paycheckReminderStore.clear();
+        new com.spotmydime.data.TransactionOverrideStore(this).clear();
+        new com.spotmydime.data.AiResultCache(this).clear();
+        new com.spotmydime.data.SyncStateStore(this).clear();
+        new com.spotmydime.data.SubjectRuleStore(this).clear();
     }
 
     private void setupSettingsProfile() {

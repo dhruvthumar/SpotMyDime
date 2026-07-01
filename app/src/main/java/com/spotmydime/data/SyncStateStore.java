@@ -3,6 +3,8 @@ package com.spotmydime.data;
 import android.content.Context;
 import android.content.SharedPreferences;
 
+import com.spotmydime.util.SecurePrefs;
+
 /**
  * Tracks the most recent Gmail message date we've successfully processed,
  * so subsequent fetches only ask Gmail for messages newer than that —
@@ -36,7 +38,11 @@ public class SyncStateStore {
     private final SharedPreferences prefs;
 
     public SyncStateStore(Context context) {
-        prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        prefs = SecurePrefs.get(context, PREFS_NAME);
+    }
+
+    public void clear() {
+        prefs.edit().clear().apply();
     }
 
     /** Returns the millis of the newest message we've processed, or 0 if never synced. */

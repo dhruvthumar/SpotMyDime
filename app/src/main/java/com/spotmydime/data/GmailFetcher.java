@@ -172,7 +172,7 @@ public class GmailFetcher {
                         Log.d(TAG, "OK  " + t.getMerchant()
                                 + "  $" + t.getAmount()
                                 + "  [" + t.getCategory() + "]"
-                                + "  " + t.getType());
+                                + "  " + t.getType().name());
                     }
                 }
 
@@ -220,9 +220,9 @@ public class GmailFetcher {
                                 int newLen      = t.getSubject()        != null ? t.getSubject().length()        : 0;
                                 if (newLen > existingLen) {
                                     deduped.set(di, t);
-                                    Log.d(TAG, "Dedup: replaced with longer subject for key=" + key);
+                                    Log.d(TAG, "Dedup: replaced with longer subject");
                                 } else {
-                                    Log.d(TAG, "Dedup: dropped duplicate for key=" + key);
+                                    Log.d(TAG, "Dedup: dropped duplicate");
                                 }
                                 break;
                             }
@@ -315,7 +315,7 @@ public class GmailFetcher {
 
         // ── Pre-filter: must have a money signal ──
         if (!SNIPPET_AMOUNT.matcher(snippet + " " + subject).find()) {
-            Log.d(TAG, "SKIP (no money signal): " + subject);
+            Log.d(TAG, "SKIP (no money signal)");
             return null;
         }
 
@@ -329,8 +329,7 @@ public class GmailFetcher {
         if (senderEmail != null && subjectRuleStore != null) {
             matchedRule = subjectRuleStore.findMatch(senderEmail, subject);
             if (matchedRule != null) {
-                Log.d(TAG, "Subject rule matched for " + senderEmail
-                        + ": " + matchedRule.keywordsKey
+                Log.d(TAG, "Subject rule matched: " + matchedRule.keywordsKey
                         + " -> alias=" + matchedRule.alias
                         + ", category=" + matchedRule.category);
             }
@@ -390,11 +389,11 @@ public class GmailFetcher {
             // real transaction, or was flagged suspicious — discard again
             // without calling Gemini.
             if ("__NOT_A_TRANSACTION__".equals(cachedAi.category)) {
-                Log.d(TAG, "DISCARD (cached: not a transaction): " + subject);
+                Log.d(TAG, "DISCARD (cached: not a transaction)");
                 return null;
             }
             if ("__SUSPICIOUS__".equals(cachedAi.category)) {
-                Log.d(TAG, "DISCARD (cached: flagged suspicious): " + subject);
+                Log.d(TAG, "DISCARD (cached: flagged suspicious)");
                 return null;
             }
             // Use cached AI result — no Gemini call needed
@@ -402,7 +401,7 @@ public class GmailFetcher {
             modelAmount = cachedAi.amount;
             modelDate   = cachedAi.date;
             aiMerchant  = cachedAi.merchant;
-            Log.d(TAG, "Using cached AI result for message " + messageId);
+            Log.d(TAG, "Using cached AI result");
         } else if (cachedCategory == null) {
             boolean likelyTxn = TransactionClassifier.isTransactional(subject, snippet, fullBody);
 
@@ -420,7 +419,7 @@ public class GmailFetcher {
                     if (aiCache != null && messageId != null) {
                         aiCache.put(messageId, null, "__SUSPICIOUS__", null, null, "outgoing");
                     }
-                    Log.d(TAG, "DISCARD (AI flagged suspicious): " + subject);
+                    Log.d(TAG, "DISCARD (AI flagged suspicious)");
                     return null;
 
                 } else if (res != null && !res.isTransaction) {
@@ -434,7 +433,7 @@ public class GmailFetcher {
                     if (aiCache != null && messageId != null) {
                         aiCache.put(messageId, null, "__NOT_A_TRANSACTION__", null, null, "outgoing");
                     }
-                    Log.d(TAG, "DISCARD (AI says not a transaction): " + subject);
+                    Log.d(TAG, "DISCARD (AI says not a transaction)");
                     return null;
 
                 } else if (res != null && !res.category.equals("Other")) {
@@ -462,7 +461,7 @@ public class GmailFetcher {
                         if (emailAddr != null && isPersonalEmailDomain(emailAddr)) {
                             boolean hasUserOverride = (overrides != null && overrides.getType(messageId) != null);
                             if (!hasUserOverride) {
-                                Log.d(TAG, "DISCARD (Other + personal domain): " + subject);
+                                Log.d(TAG, "DISCARD (Other + personal domain)");
                                 if (aiCache != null) {
                                     aiCache.put(messageId, null, "__NOT_A_TRANSACTION__", null, null, "outgoing");
                                 }
@@ -488,7 +487,7 @@ public class GmailFetcher {
                         boolean hasUserOverride = (messageId != null && overrides != null
                                 && overrides.getType(messageId) != null);
                         if (!hasUserOverride) {
-                            Log.d(TAG, "DISCARD (Gemini failed + personal domain): " + subject);
+                            Log.d(TAG, "DISCARD (Gemini failed + personal domain)");
                             if (aiCache != null && messageId != null) {
                                 aiCache.put(messageId, null, "__NOT_A_TRANSACTION__", null, null, "outgoing");
                             }
@@ -507,7 +506,7 @@ public class GmailFetcher {
                     boolean hasUserOverride = (messageId != null && overrides != null
                             && overrides.getType(messageId) != null);
                     if (!hasUserOverride) {
-                        Log.d(TAG, "DISCARD (heuristic fail + personal domain): " + subject);
+                        Log.d(TAG, "DISCARD (heuristic fail + personal domain)");
                         if (aiCache != null && messageId != null) {
                             aiCache.put(messageId, null, "__NOT_A_TRANSACTION__", null, null, "outgoing");
                         }
@@ -530,7 +529,7 @@ public class GmailFetcher {
                 boolean hasUserOverride = (messageId != null && overrides != null
                         && overrides.getType(messageId) != null);
                 if (!hasUserOverride) {
-                    Log.d(TAG, "DISCARD (personal domain, no vendor found): " + subject);
+                    Log.d(TAG, "DISCARD (personal domain, no vendor found)");
                     if (aiCache != null && messageId != null) {
                         aiCache.put(messageId, null, "__NOT_A_TRANSACTION__", null, null, "outgoing");
                     }
@@ -618,7 +617,7 @@ public class GmailFetcher {
         char avatar = from.isEmpty() ? '?' : Character.toUpperCase(from.trim().charAt(0));
 
         Log.d(TAG, "RESULT | merchant=" + merchant + " | category=" + category
-                + " | amount=" + amount + " | type=" + type);
+                + " | amount=" + (amount != null ? String.format(Locale.US, "%.2f", amount) : "null") + " | type=" + type);
 
         return new Transaction(merchant, amount, finalDateMillis, dateDisplay, category,
                 avatar, type, extractEmailFromHeader(from), subject, messageId, rawVendor);

@@ -26,7 +26,7 @@ public class GeminiClassifier {
     private static final String TAG = "GeminiClassifier";
     private static final String MODEL = "gemini-2.5-flash";
     private static final String API_URL =
-            "https://generativelanguage.googleapis.com/v1beta/models/" + MODEL + ":generateContent?key=";
+            "https://generativelanguage.googleapis.com/v1beta/models/" + MODEL + ":generateContent";
 
     /** Set from HomeActivity.onCreate via BuildConfig or strings.xml. */
     public static String apiKey = "";
@@ -72,17 +72,15 @@ public class GeminiClassifier {
         String prompt = buildPrompt(sender, subject, snippet, body);
 
         try {
-            Log.d(TAG, "Gemini call — subject: " + subject);
             throttle();
             String requestJson = buildRequest(prompt);
-            String responseJson = postJson(API_URL + apiKey, requestJson);
+            String responseJson = postJson(API_URL, requestJson);
 
             if (responseJson == null) {
                 Log.w(TAG, "Gemini null response");
                 return null;
             }
 
-            Log.d(TAG, "Gemini response: " + responseJson);
             return parseResponse(responseJson);
 
         } catch (Exception e) {
@@ -221,7 +219,7 @@ public class GeminiClassifier {
         try {
             throttle();
             String requestJson = buildRequest(prompt);
-            String responseJson = postJson(API_URL + apiKey, requestJson);
+            String responseJson = postJson(API_URL, requestJson);
             if (responseJson == null) return null;
             // Extract text from response
             JSONObject root = new JSONObject(responseJson);
@@ -275,6 +273,7 @@ public class GeminiClassifier {
             HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+            conn.setRequestProperty("X-Goog-Api-Key", apiKey);
             conn.setConnectTimeout(20000);
             conn.setReadTimeout(20000);
             conn.setDoOutput(true);
@@ -301,7 +300,7 @@ public class GeminiClassifier {
             }
 
             if (code >= 400) {
-                Log.w(TAG, "Gemini HTTP " + code + ": " + sb);
+                Log.w(TAG, "Gemini HTTP " + code);
                 return null;
             }
             return sb.toString();
@@ -354,7 +353,6 @@ public class GeminiClassifier {
             // prompt already account for "no identifiable merchant" cases that
             // genuinely warrant suspicion vs. those that don't.
             String merchantConfidence = out.optString("merchant_confidence", "low");
-            Log.d(TAG, "merchant_confidence=" + merchantConfidence + " is_suspicious=" + isSuspicious);
 
             // If model says not a transaction, return a result that clearly
             // signals that — caller (GmailFetcher) checks isTransaction and
