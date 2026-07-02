@@ -49,6 +49,7 @@ import com.spotmydime.data.Transaction;
 import com.spotmydime.data.TransactionParser;
 import com.spotmydime.data.VendorStore;
 import com.spotmydime.data.ExcludedMessageStore;
+import com.spotmydime.data.ExcludedPatternStore;
 import com.spotmydime.data.PaycheckReminderStore;
 import com.spotmydime.data.PaycheckReminderStore.PaycheckReminder;
 import com.spotmydime.data.VendorAliasStore;
@@ -99,7 +100,9 @@ public class HomeActivity extends AppCompatActivity {
     private LinearLayout containerSettingsMailScanning;
     private LinearLayout containerSettingsFeedback;
     private LinearLayout containerSettingsPaycheckReminders;
+    private LinearLayout containerSettingsAiDebug;
     private SharedPreferences settingsPrefs;
+    private int debugTapCount = 0;
     private final Map<String, Double> budgets = new HashMap<>();
     private final List<Map<String, String>> subscriptions = new ArrayList<>();
     private final Set<String> trackedSenders = new HashSet<>();
@@ -121,6 +124,7 @@ public class HomeActivity extends AppCompatActivity {
 
     private EditText etSearch;
     private ExcludedMessageStore excludedStore;
+    private ExcludedPatternStore excludedPatternStore;
     private VendorAliasStore aliasStore;
 
     // Manual entry
@@ -239,6 +243,7 @@ public class HomeActivity extends AppCompatActivity {
         containerSettingsMailScanning = findViewById(R.id.container_settings_mail_scanning);
         containerSettingsFeedback = findViewById(R.id.container_settings_feedback);
         containerSettingsPaycheckReminders = findViewById(R.id.container_settings_paycheck_reminders);
+        containerSettingsAiDebug = findViewById(R.id.container_settings_ai_debug);
 
         tvInsightsNet = findViewById(R.id.tv_insights_net);
         tvInsightsNetLabel = findViewById(R.id.tv_insights_net_label);
@@ -310,6 +315,7 @@ public class HomeActivity extends AppCompatActivity {
         });
 
         excludedStore = new ExcludedMessageStore(this);
+        excludedPatternStore = new ExcludedPatternStore(this);
 
         manualStore = new ManualTransactionStore(this);
         paycheckReminderStore = new PaycheckReminderStore(this);
@@ -374,7 +380,8 @@ public class HomeActivity extends AppCompatActivity {
             containerSettingsCategories.getVisibility() == View.VISIBLE ||
             containerSettingsEditCategory.getVisibility() == View.VISIBLE ||
             containerSettingsAutoTracking.getVisibility() == View.VISIBLE ||
-            containerSettingsPaycheckReminders.getVisibility() == View.VISIBLE) {
+            containerSettingsPaycheckReminders.getVisibility() == View.VISIBLE ||
+            containerSettingsAiDebug.getVisibility() == View.VISIBLE) {
             showSettingsScreen(containerSettingsMain);
             return;
         }
@@ -2298,7 +2305,8 @@ public class HomeActivity extends AppCompatActivity {
                             .setMessage("This transaction will be removed and this email will never be synced again.")
                             .setPositiveButton("Exclude", (dialog2, which2) -> {
                                 excludedStore.exclude(t.getMessageId());
-                                Toast.makeText(this, "Email excluded forever", Toast.LENGTH_SHORT).show();
+                                excludedPatternStore.addExclusion(t.getMerchant(), t.getSubject());
+                                Toast.makeText(this, "Merchant + subject excluded forever", Toast.LENGTH_SHORT).show();
                                 dialog.dismiss();
                                 fetchAndShowTransactions();
                             })
@@ -2804,6 +2812,24 @@ public class HomeActivity extends AppCompatActivity {
         ((TextView) findViewById(R.id.tv_settings_name)).setText(userName);
         ((TextView) findViewById(R.id.tv_settings_email)).setText(userEmail);
 
+        // 7-tap easter egg to unlock AI Debug Console
+        ImageView avatar = findViewById(R.id.iv_settings_avatar);
+        avatar.setOnClickListener(v -> {
+            if (++debugTapCount >= 7) {
+                debugTapCount = 0;
+                settingsPrefs.edit().putBoolean("debug_unlocked", true).apply();
+                Toast.makeText(this, "Developer mode enabled", Toast.LENGTH_SHORT).show();
+                View btn = findViewById(R.id.btn_settings_ai_debug);
+                btn.setVisibility(View.VISIBLE);
+                GeminiClassifier.debugMode = true;
+                GeminiClassifier.debugStore = new com.spotmydime.data.AiDebugStore(this);
+                btn.setOnClickListener(v2 -> {
+                    loadAiDebugConsole();
+                    showSettingsScreen(containerSettingsAiDebug);
+                });
+            }
+        });
+
         findViewById(R.id.btn_settings_sign_out).setOnClickListener(v -> {
             new AlertDialog.Builder(this)
                     .setTitle("Sign Out")
@@ -2873,6 +2899,20 @@ public class HomeActivity extends AppCompatActivity {
             Toast.makeText(this, "Notifications - coming soon", Toast.LENGTH_SHORT).show();
         });
         findViewById(R.id.btn_settings_feedback).setOnClickListener(v -> showSettingsScreen(containerSettingsFeedback));
+
+        // AI Debug Console — unlocked via 7-tap on avatar in Settings
+        View aiDebugBtn = findViewById(R.id.btn_settings_ai_debug);
+        if (settingsPrefs.getBoolean("debug_unlocked", false)) {
+            aiDebugBtn.setVisibility(View.VISIBLE);
+            GeminiClassifier.debugMode = true;
+            if (GeminiClassifier.debugStore == null) {
+                GeminiClassifier.debugStore = new com.spotmydime.data.AiDebugStore(this);
+            }
+            aiDebugBtn.setOnClickListener(v -> {
+                loadAiDebugConsole();
+                showSettingsScreen(containerSettingsAiDebug);
+            });
+        }
         findViewById(R.id.btn_settings_how_it_works).setOnClickListener(v -> showSupportDialog("How It Works",
                 "SpotMyDime is a personal finance assistant that connects to your Gmail inbox to automatically detect and track your spending.\n\n"
                         + "Here is how it works in three simple steps:\n\n"
@@ -2935,6 +2975,7 @@ public class HomeActivity extends AppCompatActivity {
         findViewById(R.id.btn_mail_scanning_back).setOnClickListener(v -> showSettingsScreen(containerSettingsMain));
         findViewById(R.id.btn_feedback_back).setOnClickListener(v -> showSettingsScreen(containerSettingsMain));
         findViewById(R.id.btn_paycheck_reminders_back).setOnClickListener(v -> showSettingsScreen(containerSettingsMain));
+        findViewById(R.id.btn_ai_debug_back).setOnClickListener(v -> showSettingsScreen(containerSettingsMain));
     }
 
     private void showSettingsScreen(LinearLayout target) {
@@ -2948,6 +2989,7 @@ public class HomeActivity extends AppCompatActivity {
         containerSettingsMailScanning.setVisibility(target == containerSettingsMailScanning ? View.VISIBLE : View.GONE);
         containerSettingsFeedback.setVisibility(target == containerSettingsFeedback ? View.VISIBLE : View.GONE);
         containerSettingsPaycheckReminders.setVisibility(target == containerSettingsPaycheckReminders ? View.VISIBLE : View.GONE);
+        containerSettingsAiDebug.setVisibility(target == containerSettingsAiDebug ? View.VISIBLE : View.GONE);
     }
 
     private void showSupportDialog(String title, String message) {
@@ -4764,6 +4806,276 @@ public class HomeActivity extends AppCompatActivity {
         for (final PaycheckReminder r : due) {
             showPaycheckDueDialog(r);
         }
+    }
+
+    private void loadAiDebugConsole() {
+        LinearLayout list = findViewById(R.id.container_ai_debug_entries);
+        list.removeAllViews();
+
+        com.spotmydime.data.AiDebugStore store = GeminiClassifier.debugStore;
+        if (store == null) return;
+
+        java.util.List<com.spotmydime.data.AiDebugEntry> entries = store.getAll();
+        if (entries.isEmpty()) {
+            TextView empty = new TextView(this);
+            empty.setText("No debug entries yet.\nScan some emails first.");
+            empty.setTextColor(0xFFAAAAAA);
+            empty.setTextSize(14);
+            empty.setGravity(android.view.Gravity.CENTER);
+            empty.setPadding(0, dp(60), 0, 0);
+            list.addView(empty);
+            return;
+        }
+
+        for (final com.spotmydime.data.AiDebugEntry e : entries) {
+            // ── Card ──
+            androidx.cardview.widget.CardView card = new androidx.cardview.widget.CardView(this);
+            card.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
+            ((android.widget.LinearLayout.LayoutParams) card.getLayoutParams()).bottomMargin = dp(10);
+            card.setRadius(dp(16));
+            card.setCardElevation(dp(2));
+            card.setUseCompatPadding(true);
+            card.setCardBackgroundColor(0xFFFFFFFF);
+            card.setClickable(true);
+            card.setFocusable(true);
+
+            LinearLayout inner = new LinearLayout(this);
+            inner.setOrientation(LinearLayout.VERTICAL);
+            inner.setPadding(dp(16), dp(14), dp(16), dp(14));
+
+            // ── Header row: merchant + amount + badge ──
+            LinearLayout headerRow = new LinearLayout(this);
+            headerRow.setOrientation(LinearLayout.HORIZONTAL);
+            headerRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+
+            String merchant = e.finalMerchant != null ? e.finalMerchant
+                    : (e.parsedMerchant != null ? e.parsedMerchant : "Unknown");
+
+            TextView tvMerchant = new TextView(this);
+            tvMerchant.setText(merchant);
+            tvMerchant.setTextColor(0xFF1A1A1A);
+            tvMerchant.setTextSize(16);
+            tvMerchant.setTypeface(null, android.graphics.Typeface.BOLD);
+            tvMerchant.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+            headerRow.addView(tvMerchant);
+
+            if (e.finalAmount > 0) {
+                TextView tvAmt = new TextView(this);
+                tvAmt.setText("$" + String.format("%.2f", e.finalAmount));
+                tvAmt.setTextColor(0xFF2E7D32);
+                tvAmt.setTextSize(16);
+                tvAmt.setTypeface(null, android.graphics.Typeface.BOLD);
+                tvAmt.setPadding(dp(8), 0, 0, 0);
+                headerRow.addView(tvAmt);
+            }
+
+            inner.addView(headerRow);
+
+            // ── Second row: subject (truncated) + status badge ──
+            LinearLayout subRow = new LinearLayout(this);
+            subRow.setOrientation(LinearLayout.HORIZONTAL);
+            subRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            subRow.setPadding(0, dp(4), 0, 0);
+
+            if (e.subject != null && !e.subject.isEmpty()) {
+                TextView tvSubj = new TextView(this);
+                tvSubj.setText(e.subject);
+                tvSubj.setTextColor(0xFF888888);
+                tvSubj.setTextSize(13);
+                tvSubj.setMaxLines(1);
+                tvSubj.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                tvSubj.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+                subRow.addView(tvSubj);
+            } else {
+                View spacer = new View(this);
+                spacer.setLayoutParams(new android.widget.LinearLayout.LayoutParams(0, 0, 1));
+                subRow.addView(spacer);
+            }
+
+            String statusText = e.wasDiscarded ? "DISCARDED" : "PROCESSED";
+            int statusColor = e.wasDiscarded ? 0xFFE53935 : 0xFF2E7D32;
+            TextView tvStatus = new TextView(this);
+            tvStatus.setText(statusText);
+            tvStatus.setTextColor(statusColor);
+            tvStatus.setTextSize(10);
+            tvStatus.setTypeface(null, android.graphics.Typeface.BOLD);
+            tvStatus.setPadding(dp(8), dp(3), dp(8), dp(3));
+            tvStatus.setBackgroundResource(e.wasDiscarded ? android.R.drawable.alert_light_frame : 0);
+            if (!e.wasDiscarded) {
+                tvStatus.setBackgroundColor(0xFFE8F5E9);
+            } else {
+                tvStatus.setBackgroundColor(0xFFFFEBEE);
+            }
+            tvStatus.setGravity(android.view.Gravity.CENTER);
+            {
+                android.widget.LinearLayout.LayoutParams slp = new android.widget.LinearLayout.LayoutParams(
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                        dp(20));
+                tvStatus.setLayoutParams(slp);
+            }
+            subRow.addView(tvStatus);
+
+            inner.addView(subRow);
+
+            // ── Chevron hint ──
+            TextView tvHint = new TextView(this);
+            tvHint.setText("\u25BC tap to expand");
+            tvHint.setTextColor(0xFFBBBBBB);
+            tvHint.setTextSize(10);
+            tvHint.setPadding(0, dp(6), 0, 0);
+            inner.addView(tvHint);
+
+            // ── Expandable detail section ──
+            final LinearLayout detail = new LinearLayout(this);
+            detail.setOrientation(LinearLayout.VERTICAL);
+            detail.setVisibility(View.GONE);
+            detail.setPadding(0, dp(10), 0, 0);
+
+            addDebugSectionHeader(detail, "EMAIL");
+            if (e.from != null) addDebugField(detail, "From", e.from);
+            if (e.subject != null) addDebugField(detail, "Subject", e.subject);
+            if (e.snippet != null) addDebugField(detail, "Snippet", e.snippet);
+            if (e.body != null) addDebugField(detail, "Body", e.body.length() > 300 ? e.body.substring(0, 300) + "..." : e.body);
+
+            if (e.isTransactionalResult != null) {
+                addDebugSectionHeader(detail, "PRE-FILTER");
+                addDebugField(detail, "Has money signal", String.valueOf(e.snippetAmountPassed));
+                addDebugField(detail, "isTransactional pass", String.valueOf(e.isTransactionalResult));
+            }
+
+            if (e.geminiInput != null || e.geminiOutput != null || e.geminiHttpCode != 0) {
+                addDebugSectionHeader(detail, "GEMINI");
+                if (e.geminiHttpCode != 0) {
+                    String color = e.geminiHttpCode < 400 ? "#4CAF50" : "#E53935";
+                    addDebugField(detail, "HTTP", "<font color='" + color + "'>" + e.geminiHttpCode + "</font>");
+                }
+                if (e.geminiInput != null) addDebugCodeBlock(detail, "Input (prompt)", e.geminiInput);
+                if (e.geminiOutput != null) {
+                    String out = e.geminiOutput.length() > 600 ? e.geminiOutput.substring(0, 600) + "..." : e.geminiOutput;
+                    addDebugCodeBlock(detail, "Output (raw)", out);
+                }
+                if (e.parsedCategory != null || e.parsedMerchant != null) {
+                    addDebugSectionHeader(detail, "PARSED");
+                    if (e.parsedCategory != null) addDebugField(detail, "Category", e.parsedCategory);
+                    if (e.parsedMerchant != null) addDebugField(detail, "Merchant", e.parsedMerchant);
+                    if (e.parsedAmount != null) addDebugField(detail, "Amount", String.format("$%.2f", e.parsedAmount));
+                    if (e.parsedDate != null) addDebugField(detail, "Date", e.parsedDate);
+                    if (e.parsedType != null) addDebugField(detail, "Type", e.parsedType);
+                    addDebugField(detail, "Is transaction", String.valueOf(e.parsedIsTransaction));
+                    addDebugField(detail, "Is suspicious", String.valueOf(e.parsedIsSuspicious));
+                }
+            }
+
+            addDebugSectionHeader(detail, "FINAL");
+            if (e.finalCategory != null) addDebugField(detail, "Category", e.finalCategory);
+            if (e.finalMerchant != null) addDebugField(detail, "Merchant", e.finalMerchant);
+            addDebugField(detail, "Amount", e.finalAmount > 0 ? String.format("$%.2f", e.finalAmount) : "$0.00");
+            if (e.finalDate != null) addDebugField(detail, "Date", e.finalDate);
+            if (e.finalType != null) addDebugField(detail, "Type", e.finalType);
+            addDebugField(detail, "Discarded", String.valueOf(e.wasDiscarded));
+            if (e.discardReason != null) addDebugField(detail, "Reason", e.discardReason);
+            if (e.cachedHit) addDebugField(detail, "Cache", e.cacheSource);
+
+            inner.addView(detail);
+            card.addView(inner);
+
+            card.setOnClickListener(v -> {
+                boolean show = detail.getVisibility() != View.VISIBLE;
+                detail.setVisibility(show ? View.VISIBLE : View.GONE);
+                tvHint.setText(show ? "\u25B2 tap to collapse" : "\u25BC tap to expand");
+            });
+
+            list.addView(card);
+        }
+
+        findViewById(R.id.btn_ai_debug_clear).setOnClickListener(v -> {
+            store.clear();
+            loadAiDebugConsole();
+        });
+        findViewById(R.id.btn_ai_debug_refresh).setOnClickListener(v -> loadAiDebugConsole());
+    }
+
+    private void addDebugSectionHeader(LinearLayout parent, String title) {
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(12);
+
+        TextView tv = new TextView(this);
+        tv.setLayoutParams(lp);
+        tv.setText(title);
+        tv.setTextColor(0xFF2E7D32);
+        tv.setTextSize(11);
+        tv.setTypeface(null, android.graphics.Typeface.BOLD);
+        tv.setLetterSpacing(0.08f);
+        parent.addView(tv);
+
+        View line = new View(this);
+        line.setBackgroundColor(0xFF2E7D32);
+        android.widget.LinearLayout.LayoutParams llp = new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT, dp(1));
+        llp.topMargin = dp(2);
+        llp.bottomMargin = dp(4);
+        line.setLayoutParams(llp);
+        parent.addView(line);
+    }
+
+    private void addDebugField(LinearLayout parent, String label, String value) {
+        if (value == null || value.isEmpty()) return;
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setPadding(0, dp(3), 0, dp(3));
+
+        TextView tvLabel = new TextView(this);
+        tvLabel.setText(label);
+        tvLabel.setTextColor(0xFF999999);
+        tvLabel.setTextSize(12);
+        tvLabel.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
+        row.addView(tvLabel);
+
+        TextView tvValue = new TextView(this);
+        tvValue.setText("  " + value);
+        tvValue.setTextColor(0xFF333333);
+        tvValue.setTextSize(12);
+        tvValue.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
+                0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        row.addView(tvValue);
+
+        parent.addView(row);
+    }
+
+    private void addDebugCodeBlock(LinearLayout parent, String title, String content) {
+        if (content == null || content.isEmpty()) return;
+
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText(title);
+        tvTitle.setTextColor(0xFF555555);
+        tvTitle.setTextSize(11);
+        tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+        tvTitle.setPadding(0, dp(6), 0, dp(2));
+        parent.addView(tvTitle);
+
+        androidx.cardview.widget.CardView codeCard = new androidx.cardview.widget.CardView(this);
+        codeCard.setRadius(dp(8));
+        codeCard.setCardElevation(0);
+        codeCard.setUseCompatPadding(true);
+        codeCard.setCardBackgroundColor(0xFFF5F5F5);
+        codeCard.setLayoutParams(new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        TextView tvContent = new TextView(this);
+        tvContent.setText(content);
+        tvContent.setTextColor(0xFF333333);
+        tvContent.setTextSize(10);
+        tvContent.setTypeface(android.graphics.Typeface.MONOSPACE);
+        tvContent.setPadding(dp(10), dp(8), dp(10), dp(8));
+        codeCard.addView(tvContent);
+        parent.addView(codeCard);
     }
 
     private void showPaycheckDueDialog(final PaycheckReminder r) {

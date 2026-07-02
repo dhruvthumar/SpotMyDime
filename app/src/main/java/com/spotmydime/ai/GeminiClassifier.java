@@ -24,8 +24,20 @@ public class GeminiClassifier {
     /** Set from HomeActivity.onCreate via BuildConfig. */
     public static String backendUrl = "";
 
-    /** Minimum ms between API calls to avoid hitting rate limits. */
-    private static final long MIN_INTERVAL_MS = 1200;
+    /** Debug mode — captures full prompt / raw response / parsed result for AiDebugConsole. */
+    public static boolean debugMode = false;
+    public static com.spotmydime.data.AiDebugStore debugStore;
+    public static String lastPrompt;
+    public static String lastRawResponse;
+    public static int lastHttpCode;
+    public static ClassificationResult lastResult;
+
+    /**
+     * Minimum ms between API calls.
+     * Free tier for gemini-1.5-flash: 15 RPM → 4000ms spacing.
+     * Use 7000ms to stay safe if switching to a 10-RPM model.
+     */
+    private static final long MIN_INTERVAL_MS = 7000;
     private static long lastCallTime = 0;
 
     private static void throttle() {
@@ -60,17 +72,24 @@ public class GeminiClassifier {
         try {
             throttle();
             String requestJson = buildRequest(prompt);
+            if (debugMode) lastPrompt = prompt;
+            lastHttpCode = 0;
             String responseJson = postToBackend(requestJson);
 
             if (responseJson == null) {
                 Log.w(TAG, "Backend returned null");
+                if (debugMode) { lastRawResponse = null; lastResult = null; }
                 return null;
             }
 
-            return parseResponse(responseJson);
+            if (debugMode) lastRawResponse = responseJson;
+            ClassificationResult result = parseResponse(responseJson);
+            if (debugMode) lastResult = result;
+            return result;
 
         } catch (Exception e) {
             Log.e(TAG, "Classification failed", e);
+            if (debugMode) { lastRawResponse = null; lastResult = null; }
             return null;
         }
     }
@@ -255,8 +274,8 @@ public class GeminiClassifier {
             HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-            conn.setConnectTimeout(20000);
-            conn.setReadTimeout(20000);
+            conn.setConnectTimeout(60000);
+            conn.setReadTimeout(60000);
             conn.setDoOutput(true);
 
             try (OutputStream os = conn.getOutputStream()) {
@@ -280,8 +299,13 @@ public class GeminiClassifier {
                 continue;
             }
 
+            lastHttpCode = code;
+
             if (code >= 400) {
-                Log.w(TAG, "Backend HTTP " + code);
+                String errBody = sb.toString();
+                Log.w(TAG, "Backend HTTP " + code + " — " + (errBody.length() > 200 ? errBody.substring(0, 200) : errBody));
+                if (debugMode) lastRawResponse = errBody.length() > 1000 ? errBody.substring(0, 1000) : errBody;
+                lastHttpCode = code;
                 return null;
             }
             return sb.toString();

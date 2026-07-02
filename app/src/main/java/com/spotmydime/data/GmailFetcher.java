@@ -27,7 +27,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -46,7 +48,36 @@ public class GmailFetcher {
                     "\\$\\s*[0-9]+(?:[,.][0-9]+)*|"
                             + "(?:total|amount|paid|charged|due|cost|price|spent|payment|"
                             +    "sale|balance|fee|subtotal|grand\\s+total|sum)"
-                            + "\\s*[:\\s]*\\$?\\s*[0-9]+(?:[,.][0-9]+)*",
+                            + "\\s*[:\\s]*\\$?\\s*[0-9]+(?:[,.][0-9]+)*|"
+                            + "(?:CAD|USD|EUR|GBP|C\\$)\\s*[0-9]+(?:[,.][0-9]+)*|"
+                            + "[0-9]+(?:[,.][0-9]+)*\\s*(?:CAD|USD|EUR|GBP)|"
+                            + "[€£]\\s*[0-9]+(?:[,.][0-9]+)*",
+                    Pattern.CASE_INSENSITIVE);
+
+    // Quick subject-only check: skip obvious non-transaction emails before body extraction
+    private static final Pattern NON_TRANSACTION_SUBJECT =
+            Pattern.compile(
+                    "(?:"
+                            + "new follower|"
+                            + "liked your (?:tweet|post|comment|photo|status)|"
+                            + "commented on your|"
+                            + "replied to your(?: thread)?|"
+                            + "shared your post|"
+                            + "new connection|"
+                            + "connection request|"
+                            + "accepted your connection|"
+                            + "someone (?:viewed|visited) your profile|"
+                            + "you have a new message from|"
+                            + "sent you a message|"
+                            + "welcome to|"
+                            + "verify your email|"
+                            + "email verification|"
+                            + "password reset|"
+                            + "reset your password|"
+                            + "your verification code|"
+                            + "daily digest|"
+                            + "weekly digest"
+                            + ")",
                     Pattern.CASE_INSENSITIVE);
 
     // Known personal/free email domains. Emails from these addresses with no
@@ -120,7 +151,7 @@ public class GmailFetcher {
                     return;
                 }
 
-                String query = "after:" + effectiveAfter
+                String query = "in:inbox after:" + effectiveAfter
                         + " ($ OR total OR amount OR paid OR charged OR receipt OR invoice"
                         + " OR \"order confirmation\" OR \"your order\" OR \"payment received\""
                         + " OR \"you've received\" OR \"e-transfer\" OR refund OR subscription)";
@@ -143,10 +174,12 @@ public class GmailFetcher {
                 VendorAliasStore aliasStore       = new VendorAliasStore(context);
                 SubjectRuleStore subjectRuleStore = new SubjectRuleStore(context);
                 TransactionOverrideStore overrides = new TransactionOverrideStore(context);
-                ExcludedMessageStore excluded     = new ExcludedMessageStore(context);
-                AiResultCache aiCache             = new AiResultCache(context);
+                ExcludedMessageStore excluded         = new ExcludedMessageStore(context);
+                ExcludedPatternStore excludedPatterns = new ExcludedPatternStore(context);
+                AiResultCache aiCache                 = new AiResultCache(context);
 
                 List<Transaction> results = new ArrayList<>();
+                Map<String, AiDebugEntry> parsedDebugEntries = new HashMap<>();
                 int max = Math.min(messages.length(), 60);
                 long newestSeenMillis = 0;
 
@@ -166,9 +199,46 @@ public class GmailFetcher {
                         if (msgDate > newestSeenMillis) newestSeenMillis = msgDate;
                     } catch (Exception ignored) {}
 
-                    Transaction t = parseMessage(msgJson, vendorStore, aliasStore, subjectRuleStore, overrides, aiCache, msgId);
+                    AiDebugEntry debugEntry = null;
+                    if (GeminiClassifier.debugMode) {
+                        debugEntry = new AiDebugEntry();
+                        debugEntry.messageId = msgId;
+                        debugEntry.timestamp = System.currentTimeMillis();
+                        GeminiClassifier.lastPrompt = null;
+                        GeminiClassifier.lastRawResponse = null;
+                    }
+                    Transaction t = parseMessage(msgJson, vendorStore, aliasStore, subjectRuleStore, overrides, aiCache, excludedPatterns, msgId, debugEntry);
+                    if (debugEntry != null) {
+                        ClassificationResult lastRes = GeminiClassifier.lastResult;
+                        if (lastRes != null) {
+                            debugEntry.parsedCategory = lastRes.category;
+                            debugEntry.parsedMerchant = lastRes.vendor;
+                            debugEntry.parsedAmount = lastRes.amount;
+                            debugEntry.parsedDate = lastRes.dateStr;
+                            debugEntry.parsedType = lastRes.type;
+                            debugEntry.parsedIsTransaction = lastRes.isTransaction;
+                            debugEntry.parsedIsSuspicious = lastRes.isSuspicious;
+                        }
+                        if (GeminiClassifier.lastPrompt != null) debugEntry.geminiInput = GeminiClassifier.lastPrompt;
+                        if (GeminiClassifier.lastRawResponse != null) debugEntry.geminiOutput = GeminiClassifier.lastRawResponse;
+                        debugEntry.geminiHttpCode = GeminiClassifier.lastHttpCode;
+                        if (t != null) {
+                            debugEntry.finalCategory = t.getCategory();
+                            debugEntry.finalMerchant = t.getMerchant();
+                            debugEntry.finalAmount = t.getAmount();
+                            debugEntry.finalDate = t.getDateDisplay();
+                            debugEntry.finalType = t.getType().name();
+                        } else if (debugEntry.discardReason == null) {
+                            debugEntry.wasDiscarded = true;
+                            debugEntry.discardReason = "unknown";
+                        }
+                        if (GeminiClassifier.debugStore != null) {
+                            GeminiClassifier.debugStore.add(debugEntry);
+                        }
+                    }
                     if (t != null) {
                         results.add(t);
+                        if (debugEntry != null) parsedDebugEntries.put(msgId, debugEntry);
                         Log.d(TAG, "OK  " + t.getMerchant()
                                 + "  $" + t.getAmount()
                                 + "  [" + t.getCategory() + "]"
@@ -270,6 +340,18 @@ public class GmailFetcher {
                 }
 
                 Log.d(TAG, "After dedup: " + deduped.size() + " → cross-vendor dedup: " + crossDeduped.size() + " (was " + results.size() + ")");
+
+                // ── Mark debug entries for deduped-as-duplicate transactions ──
+                Set<String> survivingIds = new HashSet<>();
+                for (Transaction t : crossDeduped) {
+                    survivingIds.add(t.getMessageId());
+                }
+                for (Map.Entry<String, AiDebugEntry> entry : parsedDebugEntries.entrySet()) {
+                    if (!survivingIds.contains(entry.getKey())) {
+                        GeminiClassifier.debugStore.markAsDuplicate(entry.getKey());
+                    }
+                }
+
                 callback.onResult(crossDeduped);
 
             } catch (Exception e) {
@@ -293,7 +375,9 @@ public class GmailFetcher {
                                             SubjectRuleStore subjectRuleStore,
                                             TransactionOverrideStore overrides,
                                             AiResultCache aiCache,
-                                            String messageId) throws Exception {
+                                            ExcludedPatternStore excludedPatterns,
+                                            String messageId,
+                                            AiDebugEntry debugEntry) throws Exception {
         JSONObject obj     = new JSONObject(msgJson);
         JSONObject payload = obj.getJSONObject("payload");
 
@@ -313,11 +397,32 @@ public class GmailFetcher {
         long   internalDate = obj.optLong("internalDate", System.currentTimeMillis());
         String snippet      = obj.optString("snippet", "");
 
-        // ── Pre-filter: must have a money signal ──
-        if (!SNIPPET_AMOUNT.matcher(snippet + " " + subject).find()) {
-            Log.d(TAG, "SKIP (no money signal)");
+        if (debugEntry != null) {
+            debugEntry.from = from;
+            debugEntry.subject = subject;
+            debugEntry.snippet = snippet;
+        }
+
+        // ── Quick subject-only check: skip obvious non-transactions before body extraction ──
+        if (NON_TRANSACTION_SUBJECT.matcher(subject).find()) {
+            Log.d(TAG, "SKIP (non-transaction subject)");
+            if (debugEntry != null) { debugEntry.wasDiscarded = true; debugEntry.discardReason = "Non-transaction subject (social/account/digest)"; }
             return null;
         }
+
+        // ── Extract body early so pre-filter can check it ──
+        String fullBody = extractBodyText(payload);
+        // Truncate to 2000 chars — enough for all checks, avoids processing mammoth HTML footers
+        if (fullBody.length() > 2000) fullBody = fullBody.substring(0, 2000);
+        if (debugEntry != null) debugEntry.body = fullBody.length() > 500 ? fullBody.substring(0, 500) : fullBody;
+
+        // ── Pre-filter: must have a money signal (check subject, snippet, AND body) ──
+        if (!SNIPPET_AMOUNT.matcher(snippet + " " + subject + " " + fullBody).find()) {
+            Log.d(TAG, "SKIP (no money signal)");
+            if (debugEntry != null) { debugEntry.snippetAmountPassed = false; debugEntry.wasDiscarded = true; debugEntry.discardReason = "no_money_signal"; }
+            return null;
+        }
+        if (debugEntry != null) debugEntry.snippetAmountPassed = true;
 
         // ── Extract vendor from From header ──
         String rawVendor  = extractVendorName(from);
@@ -343,14 +448,20 @@ public class GmailFetcher {
             }
         }
 
-        // ── Extract body ──
-        String fullBody = extractBodyText(payload);
+        // ── Check excluded patterns (merchant + subject) ──
+        if (excludedPatterns != null && excludedPatterns.isExcluded(vendor, subject)) {
+            Log.d(TAG, "SKIP (merchant + subject excluded by pattern)");
+            if (debugEntry != null) { debugEntry.wasDiscarded = true; debugEntry.discardReason = "Merchant + subject excluded by pattern"; }
+            return null;
+        }
 
         // ── Interac fast-path ──
         String lcSubject = subject.toLowerCase(Locale.US);
-        if (lcSubject.contains("interac e-transfer") || lcSubject.contains("interac e transfer")) {
-            return buildInteracTransaction(subject, from, snippet, fullBody,
+        if (lcSubject.contains("interac")) {
+            Transaction t = buildInteracTransaction(subject, from, snippet, fullBody,
                     internalDate, vendor, rawVendor, messageId, vendorStore);
+            if (debugEntry != null) { debugEntry.cachedHit = true; debugEntry.cacheSource = "interac_fastpath"; }
+            return t;
         }
 
         // ── If a subject rule matched, use its values directly (skip AI) ──
@@ -390,10 +501,12 @@ public class GmailFetcher {
             // without calling Gemini.
             if ("__NOT_A_TRANSACTION__".equals(cachedAi.category)) {
                 Log.d(TAG, "DISCARD (cached: not a transaction)");
+                if (debugEntry != null) { debugEntry.wasDiscarded = true; debugEntry.discardReason = "Previously classified as not a transaction"; }
                 return null;
             }
             if ("__SUSPICIOUS__".equals(cachedAi.category)) {
                 Log.d(TAG, "DISCARD (cached: flagged suspicious)");
+                if (debugEntry != null) { debugEntry.wasDiscarded = true; debugEntry.discardReason = "Previously flagged as suspicious"; }
                 return null;
             }
             // Use cached AI result — no Gemini call needed
@@ -404,6 +517,7 @@ public class GmailFetcher {
             Log.d(TAG, "Using cached AI result");
         } else if (cachedCategory == null) {
             boolean likelyTxn = TransactionClassifier.isTransactional(subject, snippet, fullBody);
+            if (debugEntry != null) debugEntry.isTransactionalResult = likelyTxn;
 
             if (likelyTxn) {
                 // PRIMARY: call Gemini with subject + body
@@ -420,6 +534,7 @@ public class GmailFetcher {
                         aiCache.put(messageId, null, "__SUSPICIOUS__", null, null, "outgoing");
                     }
                     Log.d(TAG, "DISCARD (AI flagged suspicious)");
+                    if (debugEntry != null) { debugEntry.wasDiscarded = true; debugEntry.discardReason = "Flagged as suspicious/scam by AI"; }
                     return null;
 
                 } else if (res != null && !res.isTransaction) {
@@ -434,6 +549,7 @@ public class GmailFetcher {
                         aiCache.put(messageId, null, "__NOT_A_TRANSACTION__", null, null, "outgoing");
                     }
                     Log.d(TAG, "DISCARD (AI says not a transaction)");
+                    if (debugEntry != null) { debugEntry.wasDiscarded = true; debugEntry.discardReason = "AI determined this is not a transaction"; }
                     return null;
 
                 } else if (res != null && !res.category.equals("Other")) {
@@ -462,6 +578,7 @@ public class GmailFetcher {
                             boolean hasUserOverride = (overrides != null && overrides.getType(messageId) != null);
                             if (!hasUserOverride) {
                                 Log.d(TAG, "DISCARD (Other + personal domain)");
+                                if (debugEntry != null) { debugEntry.wasDiscarded = true; debugEntry.discardReason = "Could not identify vendor — sent from personal email"; }
                                 if (aiCache != null) {
                                     aiCache.put(messageId, null, "__NOT_A_TRANSACTION__", null, null, "outgoing");
                                 }
@@ -488,6 +605,7 @@ public class GmailFetcher {
                                 && overrides.getType(messageId) != null);
                         if (!hasUserOverride) {
                             Log.d(TAG, "DISCARD (Gemini failed + personal domain)");
+                            if (debugEntry != null) { debugEntry.wasDiscarded = true; debugEntry.discardReason = "AI unavailable — sent from personal email"; }
                             if (aiCache != null && messageId != null) {
                                 aiCache.put(messageId, null, "__NOT_A_TRANSACTION__", null, null, "outgoing");
                             }
@@ -507,6 +625,7 @@ public class GmailFetcher {
                             && overrides.getType(messageId) != null);
                     if (!hasUserOverride) {
                         Log.d(TAG, "DISCARD (heuristic fail + personal domain)");
+                        if (debugEntry != null) { debugEntry.wasDiscarded = true; debugEntry.discardReason = "Does not look transactional — sent from personal email"; }
                         if (aiCache != null && messageId != null) {
                             aiCache.put(messageId, null, "__NOT_A_TRANSACTION__", null, null, "outgoing");
                         }
@@ -530,6 +649,7 @@ public class GmailFetcher {
                         && overrides.getType(messageId) != null);
                 if (!hasUserOverride) {
                     Log.d(TAG, "DISCARD (personal domain, no vendor found)");
+                    if (debugEntry != null) { debugEntry.wasDiscarded = true; debugEntry.discardReason = "No recognizable vendor — sent from personal email"; }
                     if (aiCache != null && messageId != null) {
                         aiCache.put(messageId, null, "__NOT_A_TRANSACTION__", null, null, "outgoing");
                     }
