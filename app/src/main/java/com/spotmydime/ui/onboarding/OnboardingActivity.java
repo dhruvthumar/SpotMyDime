@@ -27,7 +27,6 @@ public class OnboardingActivity extends AppCompatActivity {
             Intent intent = new Intent(this, HomeActivity.class);
             intent.putExtra("user_name", account.getDisplayName());
             intent.putExtra("user_email", account.getEmail());
-            intent.putExtra("id_token", account.getIdToken());
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
             startActivity(intent);
             finish();

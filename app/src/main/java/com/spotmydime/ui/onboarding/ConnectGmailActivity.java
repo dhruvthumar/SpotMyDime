@@ -44,7 +44,6 @@ public class ConnectGmailActivity extends AppCompatActivity {
         GoogleSignInOptions options = new GoogleSignInOptions
                 .Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                 .requestEmail()
-                .requestIdToken("662676808512-57golled225jop9tingau56at876ts7e.apps.googleusercontent.com")
                 .requestScopes(new Scope(GMAIL_READONLY))
                 .build();
 
@@ -70,12 +69,9 @@ public class ConnectGmailActivity extends AppCompatActivity {
             // Navigate to dashboard, pass name + email so HomeActivity can show them
             // Intent.FLAG_ACTIVITY_NEW_TASK | CLEAR_TASK means the user can't
             // press Back and return to the auth screens — they're fully logged in now
-            String idToken = account.getIdToken();
-
             Intent intent = new Intent(this, HomeActivity.class);
             intent.putExtra("user_name", name);
             intent.putExtra("user_email", email);
-            intent.putExtra("id_token", idToken);
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
             startActivity(intent);
 

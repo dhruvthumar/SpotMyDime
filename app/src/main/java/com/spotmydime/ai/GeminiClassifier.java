@@ -23,7 +23,6 @@ public class GeminiClassifier {
 
     /** Set from HomeActivity.onCreate via BuildConfig. */
     public static String backendUrl = "";
-    public static String idToken = "";
 
     /** Minimum ms between API calls to avoid hitting rate limits. */
     private static final long MIN_INTERVAL_MS = 1200;
@@ -47,8 +46,8 @@ public class GeminiClassifier {
 
     public static ClassificationResult classifyFull(String sender, String subject,
                                                      String snippet, String fullBody) {
-        if (backendUrl.isEmpty() || idToken.isEmpty()) {
-            Log.w(TAG, "Backend URL or ID token not set");
+        if (backendUrl.isEmpty()) {
+            Log.w(TAG, "Backend URL not set");
             return null;
         }
 
@@ -198,7 +197,7 @@ public class GeminiClassifier {
     }
 
     public static String generateText(String prompt) {
-        if (backendUrl.isEmpty() || idToken.isEmpty()) return null;
+        if (backendUrl.isEmpty()) return null;
         try {
             throttle();
             String requestJson = buildRequest(prompt);
@@ -256,7 +255,6 @@ public class GeminiClassifier {
             HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
-            conn.setRequestProperty("Authorization", "Bearer " + idToken);
             conn.setConnectTimeout(20000);
             conn.setReadTimeout(20000);
             conn.setDoOutput(true);

@@ -2,7 +2,6 @@ const express = require('express');
 
 const PORT = process.env.PORT || 3000;
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
-const ALLOWED_CLIENT_ID = '662676808512-57golled225jop9tingau56at876ts7e.apps.googleusercontent.com';
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
 
 if (!GEMINI_KEY) {
@@ -22,23 +21,7 @@ function start() {
   const app = express();
   app.use(express.json());
 
-  async function verifyToken(token) {
-    try {
-      const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`);
-      if (!res.ok) return null;
-      const body = await res.json();
-      return body.aud === ALLOWED_CLIENT_ID ? body : null;
-    } catch { return null; }
-  }
-
   app.post('/api/gemini/classify', async (req, res) => {
-    const auth = req.headers.authorization;
-    if (!auth || !auth.startsWith('Bearer '))
-      return res.status(401).json({ error: 'Missing token' });
-
-    if (!await verifyToken(auth.slice(7)))
-      return res.status(403).json({ error: 'Invalid token' });
-
     try {
       const geminiRes = await fetch(`${GEMINI_URL}?key=${key}`, {
         method: 'POST',
